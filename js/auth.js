@@ -20,6 +20,7 @@ import {
   updateDoc, 
   collection, 
   query, 
+  where,
   orderBy, 
   limit, 
   getDocs,
