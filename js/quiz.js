@@ -1,5 +1,5 @@
 /* ========================================================
-   QUIZ ENGINE & TINDER-STYLE CARD SWIPE INTEGRATION
+   TINDER-STYLE SWIPE QUIZ ENGINE (NO PER-IMAGE FEEDBACK)
    ======================================================== */
 
 let quizQuestions = [];
@@ -7,23 +7,23 @@ let currentQuestionIndex = 0;
 let score = 0;
 let mistakenImageIds = [];
 
-// Drag State Management
+// Drag & Touch Gesture Tracking
 let isDragging = false;
 let startX = 0;
 let currentX = 0;
-const SWIPE_THRESHOLD = 100; // Pixels needed to register a swipe decision
+const SWIPE_THRESHOLD = 90;
 
 /**
- * Initialize Quiz with a dataset of questions
+ * Starts or restarts the 20-card swipe quiz
  */
-function startQuiz(dataset) {
-  const sourceData = dataset || window.QUIZ_DATASET;
+function startQuiz() {
+  const sourceData = window.QUIZ_DATASET;
   if (!sourceData || sourceData.length === 0) {
-    console.error("No dataset available to start quiz.");
+    console.error("QUIZ_DATASET is missing or empty.");
     return;
   }
 
-  // Pick 20 questions randomly from dataset
+  // Shuffle and select 20 items
   quizQuestions = [...sourceData].sort(() => Math.random() - 0.5).slice(0, 20);
   currentQuestionIndex = 0;
   score = 0;
@@ -38,26 +38,26 @@ function startQuiz(dataset) {
   if (resultScreen) resultScreen.classList.add('hidden');
   if (activeScreen) activeScreen.classList.remove('hidden');
 
-  renderCardStack();
+  renderCard();
 }
 
 /**
- * Renders the top card and sets up drag/touch listeners
+ * Render current card in stack
  */
-function renderCardStack() {
+function renderCard() {
   const q = quizQuestions[currentQuestionIndex];
   if (!q) {
     finishQuiz();
     return;
   }
 
-  // Update progress UI
+  // Update progress
   const progressElem = document.getElementById('quiz-progress');
   const progressBar = document.getElementById('quiz-progress-bar');
   if (progressElem) progressElem.textContent = `Card ${currentQuestionIndex + 1} of ${quizQuestions.length}`;
   if (progressBar) progressBar.style.width = `${((currentQuestionIndex + 1) / quizQuestions.length) * 100}%`;
 
-  // Render Image and Reset Overlay Badges
+  // Render Image & Badges
   const cardImg = document.getElementById('swipe-card-img');
   const realBadge = document.getElementById('badge-swipe-real');
   const aiBadge = document.getElementById('badge-swipe-ai');
@@ -65,7 +65,10 @@ function renderCardStack() {
 
   if (cardImg) {
     cardImg.src = q.src;
-    cardImg.alt = `Verification Subject ${q.id || currentQuestionIndex + 1}`;
+    cardImg.onerror = () => {
+      // Fallback placeholder if missing local file
+      cardImg.src = `https://picsum.photos/500?random=${currentQuestionIndex}`;
+    };
   }
 
   if (realBadge) realBadge.style.opacity = '0';
@@ -74,35 +77,35 @@ function renderCardStack() {
   if (card) {
     card.style.transform = 'translateX(0px) rotate(0deg)';
     card.style.transition = 'none';
-    attachCardListeners(card);
+    card.style.opacity = '1';
+    attachSwipeEvents(card);
   }
 
-  // Hide instant feedback box if visible
+  // Ensure any feedback element remains hidden
   const feedbackBox = document.getElementById('quiz-feedback');
   if (feedbackBox) feedbackBox.classList.add('hidden');
 }
 
 /**
- * Attach Mouse and Touch listeners for Tinder-style drag gesture
+ * Mouse & Touch Bindings
  */
-function attachCardListeners(card) {
-  // Remove prior listeners by cloning node or directly binding pointer events
-  card.onmousedown = startDrag;
-  card.ontouchstart = startDrag;
+function attachSwipeEvents(card) {
+  card.onmousedown = handleDragStart;
+  card.ontouchstart = handleDragStart;
 }
 
-function startDrag(e) {
+function handleDragStart(e) {
   isDragging = true;
   startX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
   currentX = startX;
 
-  document.onmousemove = onDrag;
-  document.ontouchmove = onDrag;
-  document.onmouseup = endDrag;
-  document.ontouchend = endDrag;
+  document.onmousemove = handleDragMove;
+  document.ontouchmove = handleDragMove;
+  document.onmouseup = handleDragEnd;
+  document.ontouchend = handleDragEnd;
 }
 
-function onDrag(e) {
+function handleDragMove(e) {
   if (!isDragging) return;
 
   const x = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
@@ -118,19 +121,19 @@ function onDrag(e) {
     card.style.transform = `translateX(${deltaX}px) rotate(${rotate}deg)`;
   }
 
-  // Opacity of visual feedback overlays
+  // Visual Overlays during drag
   if (deltaX < 0) {
-    // Left Swipe -> REAL
+    // Left Drag -> REAL
     if (realBadge) realBadge.style.opacity = Math.min(Math.abs(deltaX) / SWIPE_THRESHOLD, 1);
     if (aiBadge) aiBadge.style.opacity = '0';
-  } else {
-    // Right Swipe -> AI
+  } else if (deltaX > 0) {
+    // Right Drag -> AI
     if (aiBadge) aiBadge.style.opacity = Math.min(Math.abs(deltaX) / SWIPE_THRESHOLD, 1);
     if (realBadge) realBadge.style.opacity = '0';
   }
 }
 
-function endDrag() {
+function handleDragEnd() {
   if (!isDragging) return;
   isDragging = false;
 
@@ -142,24 +145,22 @@ function endDrag() {
   const deltaX = currentX - startX;
 
   if (deltaX < -SWIPE_THRESHOLD) {
-    // Swiped Left -> User Guessed REAL (false for isAI)
-    processChoice(false);
+    processChoice(false); // Left = Real
   } else if (deltaX > SWIPE_THRESHOLD) {
-    // Swiped Right -> User Guessed AI (true for isAI)
-    processChoice(true);
+    processChoice(true);  // Right = AI
   } else {
-    // Snap back to center
+    // Reset position
     const card = document.getElementById('swipe-card');
     if (card) {
-      card.style.transition = 'transform 0.25s ease-out';
+      card.style.transition = 'transform 0.2s ease-out';
       card.style.transform = 'translateX(0px) rotate(0deg)';
     }
   }
 }
 
 /**
- * Handle user decision via drag OR manual buttons
- * @param {boolean} userGuessedAI True = User thinks AI, False = Real
+ * Process User Answer
+ * @param {boolean} userGuessedAI True = Right (AI), False = Left (Real)
  */
 function processChoice(userGuessedAI) {
   const q = quizQuestions[currentQuestionIndex];
@@ -171,51 +172,30 @@ function processChoice(userGuessedAI) {
   if (isCorrect) {
     score++;
   } else {
-    mistakenImageIds.push(q.id || currentQuestionIndex);
+    mistakenImageIds.push(q.id);
   }
 
-  // Animate card off screen
+  // Swipe Card Offscreen Animation
   if (card) {
-    card.style.transition = 'transform 0.4s ease-in, opacity 0.4s ease-in';
-    const direction = userGuessedAI ? 1000 : -1000;
-    card.style.transform = `translateX(${direction}px) rotate(${direction * 0.05}deg)`;
+    card.style.transition = 'transform 0.25s ease-in, opacity 0.25s ease-in';
+    const flyOut = userGuessedAI ? 800 : -800;
+    card.style.transform = `translateX(${flyOut}px) rotate(${flyOut * 0.04}deg)`;
     card.style.opacity = '0';
   }
 
-  showInstantFeedback(isCorrect, q.isAI);
-
+  // Advance immediately after swipe animation without showing per-image feedback
   setTimeout(() => {
     currentQuestionIndex++;
     if (currentQuestionIndex < quizQuestions.length) {
-      if (card) card.style.opacity = '1';
-      renderCardStack();
+      renderCard();
     } else {
       finishQuiz();
     }
-  }, 600);
+  }, 250);
 }
 
 /**
- * Visual feedback ribbon under card
- */
-function showInstantFeedback(isCorrect, actualIsAI) {
-  const feedbackBox = document.getElementById('quiz-feedback');
-  if (!feedbackBox) return;
-
-  feedbackBox.classList.remove('hidden');
-  const actualText = actualIsAI ? 'AI Synthetic' : 'Real Person';
-
-  if (isCorrect) {
-    feedbackBox.className = 'text-center font-bold p-3 rounded-xl bg-emerald-100 text-emerald-800 border border-emerald-300';
-    feedbackBox.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> Correct! Subject is ${actualText}.`;
-  } else {
-    feedbackBox.className = 'text-center font-bold p-3 rounded-xl bg-rose-100 text-rose-800 border border-rose-300';
-    feedbackBox.innerHTML = `<i class="fa-solid fa-circle-xmark mr-1"></i> Incorrect! Subject is ${actualText}.`;
-  }
-}
-
-/**
- * Finish Quiz & Save Results to Firestore
+ * Quiz Completion Handler
  */
 function finishQuiz() {
   const total = quizQuestions.length;
@@ -233,11 +213,12 @@ function finishQuiz() {
   if (scoreText) scoreText.textContent = `${score} / ${total}`;
   if (percentText) percentText.textContent = `${percentage}%`;
 
+  // Push score to Firestore via auth.js wrapper
   if (typeof window.saveQuizAttempt === 'function') {
     window.saveQuizAttempt(score, total, percentage, mistakenImageIds);
   }
 }
 
-// Attach globally
+// Global Exports
 window.startQuiz = startQuiz;
 window.processChoice = processChoice;

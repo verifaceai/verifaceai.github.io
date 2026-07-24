@@ -24,7 +24,6 @@
     .page-section { display: none; }
     .page-section.active { display: block; }
     
-    /* Swipe Card Container Fixes */
     .swipe-card-container {
       touch-action: pan-y;
       user-select: none;
@@ -33,7 +32,7 @@
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col justify-between">
 
-  <!-- HEADER -->
+  <!-- HEADER NAVIGATION -->
   <header class="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between h-16">
@@ -46,7 +45,7 @@
           <span class="text-xl font-extrabold text-slate-900 tracking-tight">VeriFace <span class="text-indigo-600">AI</span></span>
         </div>
 
-        <!-- NAVIGATION -->
+        <!-- NAV LINKS -->
         <nav class="hidden md:flex items-center gap-1 text-sm font-semibold text-slate-600">
           <button onclick="showPage('landing')" class="px-3 py-2 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition-colors">Home</button>
           <button onclick="showPage('learning')" class="px-3 py-2 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition-colors">Learning Center</button>
@@ -54,7 +53,7 @@
           <button onclick="showPage('dashboard')" class="px-3 py-2 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition-colors">Dashboard & Leaderboard</button>
         </nav>
 
-        <!-- AUTH BUTTONS & PROFILE MENU -->
+        <!-- AUTH & PROFILE DROP-DOWN MENU -->
         <div class="flex items-center gap-4 relative">
           <!-- Logged Out Button -->
           <div id="auth-logged-out">
@@ -64,14 +63,14 @@
             </button>
           </div>
 
-          <!-- Logged In Profile Menu -->
+          <!-- Logged In Menu -->
           <div id="auth-logged-in" class="hidden relative">
             <button id="user-avatar-btn" onclick="toggleUserMenu()" class="flex items-center gap-3 hover:opacity-90 focus:outline-none">
               <img id="user-avatar" src="" alt="User Profile" class="w-9 h-9 rounded-full border border-slate-300 object-cover bg-slate-200">
               <i class="fa-solid fa-chevron-down text-xs text-slate-400"></i>
             </button>
 
-            <!-- Dropdown Menu -->
+            <!-- Dropdown Options -->
             <div id="user-menu" class="hidden absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 py-2 z-50">
               <div class="px-4 py-3 border-b border-slate-100">
                 <p id="user-display-name" class="text-sm font-bold text-slate-900 truncate"></p>
@@ -80,7 +79,7 @@
               <button onclick="showPage('dashboard'); toggleUserMenu();" class="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2">
                 <i class="fa-solid fa-chart-line text-slate-400"></i> My Dashboard
               </button>
-              <button onclick="alert('Settings feature coming soon!'); toggleUserMenu();" class="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+              <button onclick="alert('Settings option selected.'); toggleUserMenu();" class="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2">
                 <i class="fa-solid fa-gear text-slate-400"></i> Settings
               </button>
               <div class="border-t border-slate-100 my-1"></div>
@@ -144,41 +143,101 @@
       </div>
     </section>
 
-    <!-- 2. LEARNING CENTER SUBPAGE -->
-    <section id="page-learning" class="page-section space-y-8">
+    <!-- 2. NEWLY STYLED LEARNING CENTER SUBPAGE -->
+    <section id="page-learning" class="page-section space-y-10">
+      
+      <!-- HEADER TITLE -->
       <div>
-        <h2 class="text-3xl font-extrabold text-slate-900 mb-2">Synthetic Media Identification Guide</h2>
-        <p class="text-slate-600 text-sm sm:text-base">Generative adversarial networks (GANs) and diffusion models leave subtle visual cues. Here is what to analyze when assessing authenticity.</p>
+        <h2 class="text-3xl font-extrabold text-slate-900 mb-2">Learning Center</h2>
+        <p class="text-slate-600 text-sm sm:text-base">Master visual forensics by comparing verified authentic photography against synthetic neural network outputs.</p>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-          <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Artifact #1</span>
-          <h3 class="text-lg font-bold text-slate-900">Eyes & Pupil Geometry</h3>
-          <p class="text-slate-600 text-sm">AI models often struggle with fine iris textures, catchlight consistency between both eyes, or produce misshapen pupils.</p>
+      <!-- TOP SECTION: SIDE-BY-SIDE COMPARISON CARDS -->
+      <div class="bg-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl space-y-6">
+        <div class="max-w-2xl">
+          <span class="bg-indigo-500/30 text-indigo-300 border border-indigo-400/30 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider mb-2 inline-block">Visual Breakdown</span>
+          <h3 class="text-2xl font-bold tracking-tight">Authentic vs. Synthetic Media</h3>
+          <p class="text-slate-300 text-sm mt-1">Examine side-by-side subjects. Generative models struggle with natural lighting refractions, structural ear symmetry, and micro hair strand definitions.</p>
         </div>
 
-        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-          <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Artifact #2</span>
-          <h3 class="text-lg font-bold text-slate-900">Hair Structure & Fine Details</h3>
-          <p class="text-slate-600 text-sm">Individual hair strands on synthetic images frequently melt together, blur into the skin, or form helmet-like shapes.</p>
-        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
+          
+          <!-- Real Image Card -->
+          <div class="bg-slate-800/80 border border-emerald-500/30 rounded-2xl p-4 space-y-3 relative overflow-hidden group">
+            <div class="absolute top-6 left-6 bg-emerald-600 text-white font-black text-xs px-3 py-1 rounded-md shadow-md uppercase tracking-wider z-10">
+              <i class="fa-solid fa-circle-check mr-1"></i> Real Human
+            </div>
+            <div class="aspect-square rounded-xl overflow-hidden bg-slate-900">
+              <img src="images/real/real_1.F.png" alt="Real Subject Sample" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onerror="this.src='https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600'">
+            </div>
+            <div>
+              <h4 class="font-bold text-base text-white">Genuine Photography</h4>
+              <p class="text-xs text-slate-300 mt-1">Exhibits consistent skin pores, asymmetric subtle blemishes, realistic reflection catchlights in both eyes, and natural hair geometry.</p>
+            </div>
+          </div>
 
-        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-          <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Artifact #3</span>
-          <h3 class="text-lg font-bold text-slate-900">Ears, Jewelry & Accessories</h3>
-          <p class="text-slate-600 text-sm">Asymmetry is common in AI portraits: mismatched earrings, glasses frames that dissolve into the temple, or strange ear folds.</p>
-        </div>
+          <!-- AI Image Card -->
+          <div class="bg-slate-800/80 border border-indigo-500/30 rounded-2xl p-4 space-y-3 relative overflow-hidden group">
+            <div class="absolute top-6 left-6 bg-indigo-600 text-white font-black text-xs px-3 py-1 rounded-md shadow-md uppercase tracking-wider z-10">
+              <i class="fa-solid fa-robot mr-1"></i> AI Generated
+            </div>
+            <div class="aspect-square rounded-xl overflow-hidden bg-slate-900">
+              <img src="images/AI/ai_1.F.png" alt="AI Subject Sample" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onerror="this.src='https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600'">
+            </div>
+            <div>
+              <h4 class="font-bold text-base text-white">Synthetic Neural Render</h4>
+              <p class="text-xs text-slate-300 mt-1">Notice overly smoothed skin, distorted background bokeh artifacts, inconsistent pupil margins, and unnatural jewelry rendering.</p>
+            </div>
 
-        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-          <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Artifact #4</span>
-          <h3 class="text-lg font-bold text-slate-900">Background Coherence</h3>
-          <p class="text-slate-600 text-sm">Background textures behind synthetic faces often feature surreal blur artifacts, floating objects, or unnatural light sources.</p>
+          </div>
+
         </div>
       </div>
+
+      <!-- BOTTOM SECTION: 4 LITTLE FEATURE BOXES -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        
+        <!-- Box 1 -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3 hover:shadow-md transition-shadow">
+          <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center font-bold text-xl">
+            <i class="fa-solid fa-shield-halved"></i>
+          </div>
+          <h3 class="text-base font-bold text-slate-900">1) Comprehensive Detection Training</h3>
+          <p class="text-xs text-slate-600 leading-relaxed">Develop systematically trained instincts for spotting neural rendering anomalies across varied lighting conditions, ages, and facial angles.</p>
+        </div>
+
+        <!-- Box 2 -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3 hover:shadow-md transition-shadow">
+          <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center font-bold text-xl">
+            <i class="fa-solid fa-ruler-combined"></i>
+          </div>
+          <h3 class="text-base font-bold text-slate-900">2) Feature 1: Proportionality</h3>
+          <p class="text-xs text-slate-600 leading-relaxed">Synthetic facial engines regularly miscalculate proportional spacing between the nose tip, lip line, pupil spacing, and outer ear lobe alignment.</p>
+        </div>
+
+        <!-- Box 3 -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3 hover:shadow-md transition-shadow">
+          <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center font-bold text-xl">
+            <i class="fa-solid fa-brain"></i>
+          </div>
+          <h3 class="text-base font-bold text-slate-900">3) Feature 2: Memorability</h3>
+          <p class="text-xs text-slate-600 leading-relaxed">AI faces frequently blend averaged human features, creating visually striking portraits that lack distinct individual micro-characteristics.</p>
+        </div>
+
+        <!-- Box 4 -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3 hover:shadow-md transition-shadow">
+          <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center font-bold text-xl">
+            <i class="fa-solid fa-eye"></i>
+          </div>
+          <h3 class="text-base font-bold text-slate-900">4) Feature 3: Familiarity</h3>
+          <p class="text-xs text-slate-600 leading-relaxed">Human brains have an innate ability to register the 'uncanny valley' effect when facial lighting vectors do not match background shadows.</p>
+        </div>
+
+      </div>
+
     </section>
 
-    <!-- 3. VERIFICATION QUIZ (TINDER-STYLE SWIPE) SUBPAGE -->
+    <!-- 3. VERIFICATION QUIZ (TINDER SWIPE CARD DECK) SUBPAGE -->
     <section id="page-quiz" class="page-section bg-white rounded-2xl shadow-sm border border-slate-200 p-8 min-h-[520px]">
       
       <!-- START SCREEN -->
@@ -193,7 +252,7 @@
         </button>
       </div>
 
-      <!-- ACTIVE SCREEN (TINDER SWIPE DECK) -->
+      <!-- ACTIVE SCREEN -->
       <div id="quiz-active-screen" class="hidden space-y-6 max-w-md mx-auto">
         <div class="flex items-center justify-between text-xs font-bold text-slate-500">
           <span id="quiz-progress">Card 1 of 20</span>
@@ -206,12 +265,12 @@
         <div class="swipe-card-container relative aspect-square w-full mx-auto">
           <div id="swipe-card" class="w-full h-full bg-slate-100 rounded-2xl overflow-hidden shadow-xl border border-slate-200 cursor-grab active:cursor-grabbing relative transition-transform">
             
-            <!-- Real Badge (Left Swipe Overlay) -->
+            <!-- Real Badge (Left Overlay) -->
             <div id="badge-swipe-real" class="absolute top-6 right-6 border-4 border-emerald-500 text-emerald-600 font-black text-2xl px-4 py-1.5 rounded-lg rotate-12 opacity-0 pointer-events-none z-10 bg-white/80">
               REAL
             </div>
 
-            <!-- AI Badge (Right Swipe Overlay) -->
+            <!-- AI Badge (Right Overlay) -->
             <div id="badge-swipe-ai" class="absolute top-6 left-6 border-4 border-indigo-600 text-indigo-600 font-black text-2xl px-4 py-1.5 rounded-lg -rotate-12 opacity-0 pointer-events-none z-10 bg-white/80">
               AI GEN
             </div>
@@ -223,7 +282,7 @@
         <!-- Feedback Banner -->
         <div id="quiz-feedback" class="hidden text-center text-sm font-semibold p-3 rounded-xl"></div>
 
-        <!-- Cue Indicators & Click Controls -->
+        <!-- Controls -->
         <div class="grid grid-cols-2 gap-4">
           <button onclick="processChoice(false)" class="py-3 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2">
             <i class="fa-solid fa-arrow-left"></i> Real Person
