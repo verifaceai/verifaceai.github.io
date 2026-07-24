@@ -3,7 +3,7 @@
    ======================================================== */
 
 // File path options for directory structures
-const AI_IMAGE_DIR = 'images/ai/';
+const AI_IMAGE_DIR = 'images/AI/';
 const REAL_IMAGE_DIR = 'images/real/';
 
 /**
