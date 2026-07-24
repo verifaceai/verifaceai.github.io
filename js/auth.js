@@ -1,45 +1,73 @@
 /* ========================================================
-   MOCK AUTHENTICATION & LOCAL LEADERBOARD STORAGE
+   AUTHENTICATION & LOCAL STORAGE (FIREBASE OAUTH)
    ======================================================== */
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { 
+  getAuth, 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  signOut, 
+  onAuthStateChanged 
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+// 1. YOUR FIREBASE CONFIGURATION (Paste your config from Step 1 here)
+const firebaseConfig = {
+  apiKey: "AIzaSyDA8mYm7gKRK-Geouey7BglXWVo2I-EVbs",
+  authDomain: "veriface-ai.firebaseapp.com",
+  projectId: "veriface-ai",
+  storageBucket: "veriface-ai.firebasestorage.app",
+  messagingSenderId: "540521994574",
+  appId: "1:540521994574:web:f3b0da48a3d2d73e74e61f",
+  measurementId: "G-E27H1ZCN27"
+};
+
+// 2. INITIALIZE FIREBASE & AUTH
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const googleProvider = new GoogleAuthProvider();
 
 let currentUser = null;
 
 /**
- * Initialize cached session check on script execution
+ * Listen for Auth state change (Handles session persistence automatically)
  */
-function initAuth() {
-  const cachedUser = localStorage.getItem('veriface_mock_user');
-  if (cachedUser) {
-    currentUser = JSON.parse(cachedUser);
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    currentUser = {
+      uid: user.uid,
+      displayName: user.displayName || 'Anonymous User',
+      email: user.email || '',
+      photoURL: user.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80'
+    };
     updateAuthUI(true);
   } else {
+    currentUser = null;
     updateAuthUI(false);
+  }
+});
+
+/**
+ * Sign in with Google Pop-up
+ */
+async function loginWithGoogle() {
+  try {
+    await signInWithPopup(auth, googleProvider);
+  } catch (error) {
+    console.error("Error signing in with Google:", error);
+    alert(`Authentication failed: ${error.message}`);
   }
 }
 
 /**
- * Simulate Google Login
+ * Sign Out User
  */
-function loginWithGoogle() {
-  currentUser = {
-    uid: 'mock_user_123',
-    displayName: 'Demo Expert',
-    email: 'expert@veriface.ai',
-    photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'
-  };
-
-  localStorage.setItem('veriface_mock_user', JSON.stringify(currentUser));
-  updateAuthUI(true);
-  loadUserStats();
-}
-
-/**
- * Simulate Logout
- */
-function logoutUser() {
-  currentUser = null;
-  localStorage.removeItem('veriface_mock_user');
-  updateAuthUI(false);
+async function logoutUser() {
+  try {
+    await signOut(auth);
+  } catch (error) {
+    console.error("Error logging out:", error);
+  }
 }
 
 /**
@@ -153,11 +181,8 @@ function loadUserStats() {
   }
 }
 
-// ATTACH TO GLOBAL WINDOW SCOPE FOR HTML ONCLICK HANDLERS
+// ATTACH TO WINDOW SCOPE FOR HTML ONCLICK HANDLERS
 window.loginWithGoogle = loginWithGoogle;
 window.logoutUser = logoutUser;
 window.saveQuizAttempt = saveQuizAttempt;
 window.loadGlobalLeaderboard = loadGlobalLeaderboard;
-
-// Run session check on load
-document.addEventListener('DOMContentLoaded', initAuth);
