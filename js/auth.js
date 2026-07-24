@@ -6,12 +6,14 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { 
   getAuth, 
   signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider, 
   signOut, 
   onAuthStateChanged 
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
-// 1. YOUR FIREBASE CONFIGURATION (Paste your config from Step 1 here)
+// 1. YOUR FIREBASE CONFIGURATION
 const firebaseConfig = {
   apiKey: "AIzaSyDA8mYm7gKRK-Geouey7BglXWVo2I-EVbs",
   authDomain: "veriface-ai.firebaseapp.com",
@@ -27,10 +29,28 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 
+// Prompt account selection every time
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
+
 let currentUser = null;
 
 /**
- * Listen for Auth state change (Handles session persistence automatically)
+ * Handles redirect authentication completion (Crucial for Safari/iOS)
+ */
+getRedirectResult(auth)
+  .then((result) => {
+    if (result && result.user) {
+      console.log("Signed in successfully via redirect:", result.user);
+    }
+  })
+  .catch((error) => {
+    console.error("Redirect Sign-in error:", error);
+  });
+
+/**
+ * Listen for Auth state change (Handles persistent login sessions)
  */
 onAuthStateChanged(auth, (user) => {
   if (user) {
@@ -48,14 +68,42 @@ onAuthStateChanged(auth, (user) => {
 });
 
 /**
- * Sign in with Google Pop-up
+ * Smart Google Login (Works on Safari, Chrome, and Mobile)
  */
 async function loginWithGoogle() {
+  // Detect Safari / iOS to bypass popup blocking directly
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+  if (isSafari || isIOS) {
+    // Safari blocks third-party popups/cookies; trigger redirect flow directly
+    try {
+      await signInWithRedirect(auth, googleProvider);
+    } catch (error) {
+      console.error("Safari redirect login error:", error);
+      alert(`Authentication failed: ${error.message}`);
+    }
+    return;
+  }
+
+  // Standard Popup Flow for Chrome, Firefox, Edge, etc.
   try {
     await signInWithPopup(auth, googleProvider);
   } catch (error) {
-    console.error("Error signing in with Google:", error);
-    alert(`Authentication failed: ${error.message}`);
+    console.warn("Popup blocked or failed, attempting redirect fallback code:", error.code);
+    if (
+      error.code === 'auth/popup-blocked' || 
+      error.code === 'auth/popup-closed-by-user' ||
+      error.code === 'auth/cancelled-popup-request'
+    ) {
+      try {
+        await signInWithRedirect(auth, googleProvider);
+      } catch (redirectError) {
+        console.error("Redirect fallback failed:", redirectError);
+      }
+    } else {
+      alert(`Authentication failed: ${error.message}`);
+    }
   }
 }
 
@@ -177,7 +225,7 @@ function loadUserStats() {
     document.getElementById('stat-total-attempts').textContent = attempts;
   }
   if (document.getElementById('stat-best-score')) {
-    document.getElementById('stat-best-score').textContent = `${bestPercent}%`;
+    document.getElementById('stat-best-score').textContent = `${isNaN(bestPercent) ? 0 : bestPercent}%`;
   }
 }
 
