@@ -96,7 +96,6 @@ function prepareTrainingModule() {
   isAnswerSubmitted = false;
   isBlockModalOpen = false;
 
-  // Ensure modal is strictly hidden when loading the landing page
   const modal = document.getElementById('block-instruction-modal');
   if (modal) {
     modal.classList.add('hidden');
@@ -105,10 +104,10 @@ function prepareTrainingModule() {
 
 /**
  * Displays the modal instruction prior to starting a block
- * Triggered ONLY when visiting the training module page
  */
 function showBlockInstructionModal() {
-  const block = TRAINING_BLOCKS_DATA[currentBlockIndex];
+  const blocks = window.TRAINING_BLOCKS_DATA || [];
+  const block = blocks[currentBlockIndex];
   if (!block) return;
 
   const modal = document.getElementById('block-instruction-modal');
@@ -158,7 +157,8 @@ function startCurrentBlock() {
  * Renders the current image case within the active block
  */
 function renderTrainingCase() {
-  const block = TRAINING_BLOCKS_DATA[currentBlockIndex];
+  const blocks = window.TRAINING_BLOCKS_DATA || [];
+  const block = blocks[currentBlockIndex];
   if (!block) return;
 
   const currentCase = block.images[currentImageIndexInBlock];
@@ -166,13 +166,17 @@ function renderTrainingCase() {
 
   isAnswerSubmitted = false;
 
-  // Update image
+  // Update image with fallback loading
   const imgElement = document.getElementById('training-img');
   if (imgElement) {
     imgElement.src = currentCase.src;
     imgElement.onerror = function() {
-      const label = currentCase.isAI ? 'AI Synthetic' : 'Real Person';
-      this.src = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='1024' viewBox='0 0 1024 1024'><rect width='1024' height='1024' fill='%23f1f5f9'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='28' font-weight='bold' fill='%23475569'>${label}</text></svg>`;
+      if (currentCase.fallbackSrc && this.src !== currentCase.fallbackSrc) {
+        this.src = currentCase.fallbackSrc;
+      } else {
+        const label = currentCase.isAI ? 'AI Synthetic' : 'Real Person';
+        this.src = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='1024' viewBox='0 0 1024 1024'><rect width='1024' height='1024' fill='%23f1f5f9'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='28' font-weight='bold' fill='%23475569'>${label}</text></svg>`;
+      }
     };
   }
 
@@ -193,7 +197,6 @@ function renderTrainingCase() {
     featureTag.textContent = `${block.title} Focus`;
   }
 
-  // Hide feedback, show interactive buttons
   const feedbackBox = document.getElementById('training-feedback');
   const buttonsBox = document.getElementById('training-buttons');
   if (feedbackBox) feedbackBox.classList.add('hidden');
@@ -203,13 +206,14 @@ function renderTrainingCase() {
 }
 
 /**
- * Processes user guess (AI = true, Real = false)
+ * Processes user guess
  */
 function submitTrainingGuess(guessedAI) {
   if (isAnswerSubmitted) return;
   isAnswerSubmitted = true;
 
-  const block = TRAINING_BLOCKS_DATA[currentBlockIndex];
+  const blocks = window.TRAINING_BLOCKS_DATA || [];
+  const block = blocks[currentBlockIndex];
   const currentCase = block.images[currentImageIndexInBlock];
   const isCorrect = (guessedAI === currentCase.isAI);
 
@@ -242,13 +246,14 @@ function submitTrainingGuess(guessedAI) {
  * Advances to next image or next block
  */
 function nextTrainingCase() {
-  const block = TRAINING_BLOCKS_DATA[currentBlockIndex];
+  const blocks = window.TRAINING_BLOCKS_DATA || [];
+  const block = blocks[currentBlockIndex];
 
   if (currentImageIndexInBlock < block.images.length - 1) {
     currentImageIndexInBlock++;
     renderTrainingCase();
   } else {
-    if (currentBlockIndex < TRAINING_BLOCKS_DATA.length - 1) {
+    if (currentBlockIndex < blocks.length - 1) {
       currentBlockIndex++;
       currentImageIndexInBlock = 0;
       showBlockInstructionModal();
@@ -315,7 +320,12 @@ function showTrainingCompletionMessage() {
   }
 }
 
-// Silently prepare training state and hide modal on boot
+// Global functions
+window.submitTrainingGuess = submitTrainingGuess;
+window.nextTrainingCase = nextTrainingCase;
+window.startCurrentBlock = startCurrentBlock;
+window.onEnterTrainingPage = onEnterTrainingPage;
+
 document.addEventListener('DOMContentLoaded', () => {
   prepareTrainingModule();
 });

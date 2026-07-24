@@ -17,10 +17,15 @@ const SWIPE_THRESHOLD = 90;
  * Starts or restarts the 20-card swipe quiz
  */
 function startQuiz() {
-  const sourceData = window.QUIZ_DATASET;
+  let sourceData = window.QUIZ_DATASET;
+  
   if (!sourceData || sourceData.length === 0) {
-    console.error("QUIZ_DATASET is missing or empty.");
-    return;
+    if (typeof window.generateRandomQuizSet === 'function') {
+      sourceData = window.generateRandomQuizSet();
+    } else {
+      console.error("QUIZ_DATASET is missing or empty.");
+      return;
+    }
   }
 
   // Shuffle and select 20 items
@@ -65,9 +70,12 @@ function renderCard() {
 
   if (cardImg) {
     cardImg.src = q.src;
-    cardImg.onerror = () => {
-      // Fallback placeholder if missing local file
-      cardImg.src = `https://picsum.photos/500?random=${currentQuestionIndex}`;
+    cardImg.onerror = function() {
+      if (q.fallbackSrc && this.src !== q.fallbackSrc) {
+        this.src = q.fallbackSrc;
+      } else {
+        this.src = `https://picsum.photos/500?random=${currentQuestionIndex}`;
+      }
     };
   }
 
@@ -81,7 +89,6 @@ function renderCard() {
     attachSwipeEvents(card);
   }
 
-  // Ensure any feedback element remains hidden
   const feedbackBox = document.getElementById('quiz-feedback');
   if (feedbackBox) feedbackBox.classList.add('hidden');
 }
@@ -183,7 +190,7 @@ function processChoice(userGuessedAI) {
     card.style.opacity = '0';
   }
 
-  // Advance immediately after swipe animation without showing per-image feedback
+  // Advance immediately after swipe animation
   setTimeout(() => {
     currentQuestionIndex++;
     if (currentQuestionIndex < quizQuestions.length) {
@@ -221,4 +228,5 @@ function finishQuiz() {
 
 // Global Exports
 window.startQuiz = startQuiz;
+window.resetQuiz = startQuiz;
 window.processChoice = processChoice;

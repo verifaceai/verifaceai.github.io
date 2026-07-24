@@ -143,7 +143,6 @@ window.loginWithGoogle = async function() {
 window.logoutUser = async function() {
   try {
     await signOut(auth);
-    // Close user menu if open
     const menu = document.getElementById("user-menu");
     if (menu) menu.classList.add("hidden");
   } catch (error) {
@@ -260,9 +259,10 @@ async function loadUserStats() {
 
 /**
  * Fetch and Render Performance Chart from Firestore
+ * Maps Attempts on X-Axis and Percentage (%) on Y-Axis
  */
 async function loadUserPerformanceChart() {
-  const canvas = document.getElementById("user-performance-chart");
+  const canvas = document.getElementById("user-performance-chart") || document.getElementById("performanceChart");
   const overlay = document.getElementById("chart-logged-out-overlay");
 
   if (!canvas || !currentUser) return;
@@ -289,6 +289,7 @@ async function loadUserPerformanceChart() {
     });
 
     renderChartInstance(
+      canvas,
       labels.length > 0 ? labels : ["Attempt 1"], 
       scores.length > 0 ? scores : [0]
     );
@@ -301,21 +302,23 @@ async function loadUserPerformanceChart() {
  * Render Demo Chart when logged out
  */
 function renderDemoChart() {
+  const canvas = document.getElementById("user-performance-chart") || document.getElementById("performanceChart");
   const overlay = document.getElementById("chart-logged-out-overlay");
   if (overlay) overlay.classList.remove("hidden");
 
   const demoLabels = ['Attempt 1', 'Attempt 2', 'Attempt 3', 'Attempt 4', 'Attempt 5'];
   const demoScores = [45, 60, 75, 80, 90];
 
-  renderChartInstance(demoLabels, demoScores);
+  if (canvas) {
+    renderChartInstance(canvas, demoLabels, demoScores);
+  }
 }
 
 /**
- * Universal Chart.js Renderer
+ * Universal Chart.js Renderer (Attempts on X, % on Y)
  */
-function renderChartInstance(labels, scores) {
-  const canvas = document.getElementById("user-performance-chart");
-  if (!canvas) return;
+function renderChartInstance(canvas, labels, scores) {
+  if (!canvas || typeof Chart === "undefined") return;
 
   if (userChartInstance) {
     userChartInstance.destroy();
@@ -357,14 +360,19 @@ function renderChartInstance(labels, scores) {
         }
       },
       scales: {
-        x: { grid: { display: false } },
+        x: { 
+          grid: { display: false },
+          title: { display: true, text: 'Quiz Attempts' }
+        },
         y: {
           min: 0,
           max: 100,
+          title: { display: true, text: 'Performance (%)' },
           ticks: {
             stepSize: 20,
             callback: (val) => `${val}%`
-          }
+          },
+          grid: { color: '#f1f5f9' }
         }
       }
     }
@@ -396,7 +404,7 @@ async function loadGlobalLeaderboard() {
         <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
           <td class="py-3 px-4 font-bold text-slate-700">#${rank++}</td>
           <td class="py-3 px-4 flex items-center gap-3">
-            <img src="${user.photoURL || 'https://via.placeholder.com/150'}" class="w-8 h-8 rounded-full border object-cover">
+            <img src="${user.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80'}" class="w-8 h-8 rounded-full border object-cover">
             <span class="font-semibold text-slate-900">${user.displayName || 'Anonymous'}</span>
           </td>
           <td class="py-3 px-4 font-bold text-indigo-600">${user.bestScore || 0}</td>
@@ -418,3 +426,4 @@ window.saveQuizAttempt = saveQuizAttempt;
 window.saveQuizScore = saveQuizAttempt;
 window.loadGlobalLeaderboard = loadGlobalLeaderboard;
 window.loadUserStats = loadUserStats;
+window.loadUserPerformanceChart = loadUserPerformanceChart;
