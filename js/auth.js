@@ -1,5 +1,5 @@
 /* ========================================================
-   AUTHENTICATION & LOCAL STORAGE (FIREBASE OAUTH)
+   AUTHENTICATION & FIRESTORE DATABASE + CHART INTEGRATION
    ======================================================== */
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -13,7 +13,24 @@ import {
   onAuthStateChanged 
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
-// 1. YOUR FIREBASE CONFIGURATION
+import { 
+  getFirestore, 
+  doc, 
+  getDoc, 
+  setDoc, 
+  updateDoc, 
+  collection, 
+  addDoc, 
+  query, 
+  where,
+  orderBy, 
+  limit, 
+  getDocs,
+  arrayUnion,
+  increment 
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+// 1. FIREBASE CONFIGURATION
 const firebaseConfig = {
   apiKey: "AIzaSyDA8mYm7gKRK-Geouey7BglXWVo2I-EVbs",
   authDomain: "veriface-ai.firebaseapp.com",
@@ -24,35 +41,32 @@ const firebaseConfig = {
   measurementId: "G-E27H1ZCN27"
 };
 
-// 2. INITIALIZE FIREBASE & AUTH
+// 2. INITIALIZE SERVICES
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
 
-// Prompt account selection every time
-googleProvider.setCustomParameters({
-  prompt: 'select_account'
-});
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 let currentUser = null;
+let performanceChart = null;
 
 /**
- * Handles redirect authentication completion (Crucial for Safari/iOS)
+ * Handles Safari redirect completion
  */
 getRedirectResult(auth)
   .then((result) => {
     if (result && result.user) {
-      console.log("Signed in successfully via redirect:", result.user);
+      syncUserProfile(result.user);
     }
   })
-  .catch((error) => {
-    console.error("Redirect Sign-in error:", error);
-  });
+  .catch((error) => console.error("Redirect Sign-in error:", error));
 
 /**
- * Listen for Auth state change (Handles persistent login sessions)
+ * Auth state change listener
  */
-onAuthStateChanged(auth, (user) => {
+onAuthStateChanged(auth, async (user) => {
   if (user) {
     currentUser = {
       uid: user.uid,
@@ -60,6 +74,7 @@ onAuthStateChanged(auth, (user) => {
       email: user.email || '',
       photoURL: user.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80'
     };
+    await syncUserProfile(user);
     updateAuthUI(true);
   } else {
     currentUser = null;
@@ -68,39 +83,48 @@ onAuthStateChanged(auth, (user) => {
 });
 
 /**
- * Smart Google Login (Works on Safari, Chrome, and Mobile)
+ * Ensures user document exists in Firestore
+ */
+async function syncUserProfile(user) {
+  const userRef = doc(db, "users", user.uid);
+  const userSnap = await getDoc(userRef);
+
+  if (!userSnap.exists()) {
+    await setDoc(userRef, {
+      uid: user.uid,
+      displayName: user.displayName || 'Anonymous User',
+      email: user.email || '',
+      photoURL: user.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
+      totalAttempts: 0,
+      bestScore: 0,
+      bestPercentage: 0,
+      mistakenImageIds: [],
+      createdAt: new Date().toISOString()
+    });
+  }
+}
+
+/**
+ * Login function (Handles popup + redirect fallbacks)
  */
 async function loginWithGoogle() {
-  // Detect Safari / iOS to bypass popup blocking directly
   const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
   if (isSafari || isIOS) {
-    // Safari blocks third-party popups/cookies; trigger redirect flow directly
     try {
       await signInWithRedirect(auth, googleProvider);
     } catch (error) {
-      console.error("Safari redirect login error:", error);
       alert(`Authentication failed: ${error.message}`);
     }
     return;
   }
 
-  // Standard Popup Flow for Chrome, Firefox, Edge, etc.
   try {
     await signInWithPopup(auth, googleProvider);
   } catch (error) {
-    console.warn("Popup blocked or failed, attempting redirect fallback code:", error.code);
-    if (
-      error.code === 'auth/popup-blocked' || 
-      error.code === 'auth/popup-closed-by-user' ||
-      error.code === 'auth/cancelled-popup-request'
-    ) {
-      try {
-        await signInWithRedirect(auth, googleProvider);
-      } catch (redirectError) {
-        console.error("Redirect fallback failed:", redirectError);
-      }
+    if (['auth/popup-blocked', 'auth/popup-closed-by-user'].includes(error.code)) {
+      await signInWithRedirect(auth, googleProvider);
     } else {
       alert(`Authentication failed: ${error.message}`);
     }
@@ -108,7 +132,7 @@ async function loginWithGoogle() {
 }
 
 /**
- * Sign Out User
+ * Logout
  */
 async function logoutUser() {
   try {
@@ -119,7 +143,7 @@ async function logoutUser() {
 }
 
 /**
- * Update Header UI based on login state
+ * Update UI elements based on authentication state
  */
 function updateAuthUI(isLoggedIn) {
   const loggedOutBox = document.getElementById('auth-logged-out');
@@ -141,91 +165,252 @@ function updateAuthUI(isLoggedIn) {
   } else {
     if (loggedOutBox) loggedOutBox.classList.remove('hidden');
     if (loggedInBox) loggedInBox.classList.add('hidden');
+    renderDemoChart();
   }
+  loadGlobalLeaderboard();
 }
 
 /**
- * Save Quiz Attempt to LocalStorage & Mock Leaderboard
+ * Save Quiz Attempt to Firestore Database
  */
-function saveQuizAttempt(score, total, percentage) {
-  let history = JSON.parse(localStorage.getItem('veriface_quiz_history') || '[]');
-  
-  const attemptRecord = {
+async function saveQuizAttempt(score, total, percentage, mistakenIds = []) {
+  const attemptData = {
     uid: currentUser ? currentUser.uid : 'guest',
     displayName: currentUser ? currentUser.displayName : 'Guest User',
     photoURL: currentUser ? currentUser.photoURL : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
     score: score,
     total: total,
     percentage: percentage,
+    mistakenIds: mistakenIds,
     timestamp: new Date().toISOString()
   };
 
-  history.push(attemptRecord);
-  localStorage.setItem('veriface_quiz_history', JSON.stringify(history));
+  try {
+    // 1. Store in attempts collection
+    await addDoc(collection(db, "quiz_attempts"), attemptData);
 
-  const bestScore = Math.max(...history.map(h => h.score));
-  localStorage.setItem('veriface_best_score', bestScore);
-  localStorage.setItem('veriface_attempts_count', history.length);
+    // 2. Update user profile document if signed in
+    if (currentUser) {
+      const userRef = doc(db, "users", currentUser.uid);
+      const userSnap = await getDoc(userRef);
 
-  loadUserStats();
-  loadGlobalLeaderboard();
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        const newBest = Math.max(userData.bestScore || 0, score);
+        const newBestPercent = Math.max(userData.bestPercentage || 0, percentage);
+
+        await updateDoc(userRef, {
+          totalAttempts: increment(1),
+          bestScore: newBest,
+          bestPercentage: newBestPercent,
+          mistakenImageIds: arrayUnion(...mistakenIds)
+        });
+      }
+    }
+
+    loadUserStats();
+    loadGlobalLeaderboard();
+  } catch (err) {
+    console.error("Error saving quiz attempt to Cloud Firestore:", err);
+  }
 }
 
 /**
- * Load Global Leaderboard from LocalStorage
+ * Fetch and Render Real User Performance Chart from Firestore
  */
-function loadGlobalLeaderboard() {
+async function loadUserPerformanceChart() {
+  const canvas = document.getElementById('user-performance-chart');
+  const overlay = document.getElementById('chart-logged-out-overlay');
+
+  if (!canvas || !currentUser) return;
+
+  // Hide overlay for logged in users
+  if (overlay) overlay.classList.add('hidden');
+
+  try {
+    // Query attempts by UID ordered chronologically
+    const attemptsRef = collection(db, "quiz_attempts");
+    const q = query(
+      attemptsRef, 
+      where("uid", "==", currentUser.uid), 
+      orderBy("timestamp", "asc")
+    );
+
+    const querySnapshot = await getDocs(q);
+    const labels = [];
+    const scores = [];
+
+    let attemptNum = 1;
+    querySnapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      labels.push(`Attempt ${attemptNum}`);
+      scores.push(data.percentage);
+      attemptNum++;
+    });
+
+    // Render chart with user data or default flat start
+    renderChartInstance(
+      labels.length > 0 ? labels : ['Attempt 1'], 
+      scores.length > 0 ? scores : [0]
+    );
+
+  } catch (error) {
+    console.error("Error loading performance chart:", error);
+    // If composite index error happens on first query, fall back gracefully
+    if (error.message.includes('index')) {
+      console.warn("Firestore requires a composite index. Follow the URL in the error above to construct it.");
+    }
+  }
+}
+
+/**
+ * Render Demo Chart behind blur overlay when logged out
+ */
+function renderDemoChart() {
+  const overlay = document.getElementById('chart-logged-out-overlay');
+  if (overlay) overlay.classList.remove('hidden');
+
+  const demoLabels = ['Attempt 1', 'Attempt 2', 'Attempt 3', 'Attempt 4', 'Attempt 5', 'Attempt 6'];
+  const demoScores = [45, 55, 60, 75, 80, 95];
+
+  renderChartInstance(demoLabels, demoScores);
+}
+
+/**
+ * Universal Chart.js Renderer
+ */
+function renderChartInstance(labels, scores) {
+  const canvas = document.getElementById('user-performance-chart');
+  if (!canvas) return;
+
+  if (performanceChart) {
+    performanceChart.destroy();
+  }
+
+  const ctx = canvas.getContext('2d');
+  
+  // Gradient styling
+  const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+  gradient.addColorStop(0, 'rgba(79, 70, 229, 0.35)');
+  gradient.addColorStop(1, 'rgba(79, 70, 229, 0.0)');
+
+  performanceChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Accuracy Score (%)',
+        data: scores,
+        borderColor: '#4f46e5',
+        borderWidth: 3,
+        backgroundColor: gradient,
+        fill: true,
+        tension: 0.35,
+        pointRadius: 5,
+        pointHoverRadius: 7,
+        pointBackgroundColor: '#4f46e5',
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (context) => `Accuracy: ${context.parsed.y}%`
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false }
+        },
+        y: {
+          min: 0,
+          max: 100,
+          ticks: {
+            stepSize: 20,
+            callback: (val) => `${val}%`
+          }
+        }
+      }
+    }
+  });
+}
+
+/**
+ * Load Global Leaderboard from Cloud Firestore
+ */
+async function loadGlobalLeaderboard() {
   const leaderboardBody = document.getElementById('leaderboard-table-body');
   if (!leaderboardBody) return;
 
-  let history = JSON.parse(localStorage.getItem('veriface_quiz_history') || '[]');
+  try {
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, orderBy("bestPercentage", "desc"), limit(10));
+    const querySnapshot = await getDocs(q);
 
-  if (history.length === 0) {
-    history = [
-      { displayName: 'Alex Rivera', photoURL: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80', score: 20, total: 20, percentage: 100, timestamp: new Date().toISOString() },
-      { displayName: 'Dr. Marcus Vance', photoURL: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80', score: 19, total: 20, percentage: 95, timestamp: new Date().toISOString() },
-      { displayName: 'Elena Rostova', photoURL: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80', score: 18, total: 20, percentage: 90, timestamp: new Date().toISOString() }
-    ];
+    let html = '';
+    let rank = 1;
+
+    querySnapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      if (data.totalAttempts > 0) {
+        html += `
+          <tr class="hover:bg-slate-50 border-b border-slate-100">
+            <td class="py-3 px-4 font-bold text-indigo-600">#${rank}</td>
+            <td class="py-3 px-4 flex items-center gap-3">
+              <img src="${data.photoURL}" class="w-7 h-7 rounded-full object-cover border">
+              <span class="font-semibold text-slate-800">${data.displayName}</span>
+            </td>
+            <td class="py-3 px-4 font-extrabold text-slate-900">${data.bestScore} / 20</td>
+            <td class="py-3 px-4"><span class="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-xs">${data.bestPercentage}%</span></td>
+            <td class="py-3 px-4 text-xs text-slate-400">${data.totalAttempts} attempts</td>
+          </tr>
+        `;
+        rank++;
+      }
+    });
+
+    if (html === '') {
+      leaderboardBody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-slate-400">No scores logged yet! Be the first.</td></tr>`;
+    } else {
+      leaderboardBody.innerHTML = html;
+    }
+  } catch (error) {
+    console.error("Error loading leaderboard from Firestore:", error);
   }
-
-  history.sort((a, b) => b.score - a.score);
-
-  let html = '';
-  let rank = 1;
-
-  history.slice(0, 10).forEach((data) => {
-    const dateStr = new Date(data.timestamp).toLocaleDateString();
-    html += `
-      <tr class="hover:bg-slate-50 border-b border-slate-100">
-        <td class="py-3 px-4 font-bold text-indigo-600">#${rank}</td>
-        <td class="py-3 px-4 flex items-center gap-3">
-          <img src="${data.photoURL}" class="w-7 h-7 rounded-full object-cover border">
-          <span class="font-semibold text-slate-800">${data.displayName}</span>
-        </td>
-        <td class="py-3 px-4 font-extrabold text-slate-900">${data.score} / ${data.total}</td>
-        <td class="py-3 px-4"><span class="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-xs">${data.percentage}%</span></td>
-        <td class="py-3 px-4 text-xs text-slate-400">${dateStr}</td>
-      </tr>
-    `;
-    rank++;
-  });
-
-  leaderboardBody.innerHTML = html;
 }
 
 /**
- * Load user stats for dashboard
+ * Load User Dashboard Stats from Cloud Firestore
  */
-function loadUserStats() {
-  const attempts = localStorage.getItem('veriface_attempts_count') || '0';
-  const best = localStorage.getItem('veriface_best_score') || '0';
-  const bestPercent = Math.round((parseInt(best) / 20) * 100);
+async function loadUserStats() {
+  if (!currentUser) return;
 
-  if (document.getElementById('stat-total-attempts')) {
-    document.getElementById('stat-total-attempts').textContent = attempts;
-  }
-  if (document.getElementById('stat-best-score')) {
-    document.getElementById('stat-best-score').textContent = `${isNaN(bestPercent) ? 0 : bestPercent}%`;
+  try {
+    const userRef = doc(db, "users", currentUser.uid);
+    const userSnap = await getDoc(userRef);
+
+    if (userSnap.exists()) {
+      const data = userSnap.data();
+
+      if (document.getElementById('stat-total-attempts')) {
+        document.getElementById('stat-total-attempts').textContent = data.totalAttempts || 0;
+      }
+      if (document.getElementById('stat-best-score')) {
+        document.getElementById('stat-best-score').textContent = `${data.bestPercentage || 0}%`;
+      }
+    }
+
+    // Load actual performance chart for user
+    loadUserPerformanceChart();
+
+  } catch (error) {
+    console.error("Error fetching user stats from Firestore:", error);
   }
 }
 
@@ -234,3 +419,5 @@ window.loginWithGoogle = loginWithGoogle;
 window.logoutUser = logoutUser;
 window.saveQuizAttempt = saveQuizAttempt;
 window.loadGlobalLeaderboard = loadGlobalLeaderboard;
+window.loadUserStats = loadUserStats;
+window.loadUserPerformanceChart = loadUserPerformanceChart;

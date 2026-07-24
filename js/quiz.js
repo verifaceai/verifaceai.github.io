@@ -1,223 +1,170 @@
 /* ========================================================
-   20-CARD SWIPE QUIZ ENGINE
+   QUIZ ENGINE & FIRESTORE INTEGRATION
    ======================================================== */
 
-let currentQuizIndex = 0;
-let quizScore = 0;
-let isSwiping = false;
-let startX = 0;
-let currentX = 0;
-let cardElement = null;
+// Global Quiz State
+let quizQuestions = [];
+let currentQuestionIndex = 0;
+let score = 0;
+let userAnswers = [];
+let mistakenImageIds = [];
 
 /**
- * Resets and initializes the 20-Card Quiz
+ * Initialize Quiz with a dataset of questions
+ * @param {Array} dataset Array of question objects: { id, image, isReal, explanation }
  */
-function resetQuiz() {
-  currentQuizIndex = 0;
-  quizScore = 0;
-  isSwiping = false;
+function startQuiz(dataset) {
+  if (!dataset || dataset.length === 0) {
+    console.error("No dataset provided to start the quiz.");
+    return;
+  }
 
-  const cardContainer = document.getElementById('quiz-card-container');
-  const quizControls = document.getElementById('quiz-controls');
-  const resultsBox = document.getElementById('quiz-results');
+  // Shuffle and reset state
+  quizQuestions = [...dataset].sort(() => Math.random() - 0.5).slice(0, 20); // Pick 20 questions
+  currentQuestionIndex = 0;
+  score = 0;
+  userAnswers = [];
+  mistakenImageIds = [];
 
-  if (cardContainer) cardContainer.classList.remove('hidden');
-  if (quizControls) quizControls.classList.remove('hidden');
-  if (resultsBox) resultsBox.classList.add('hidden');
+  // Toggle screens
+  const startScreen = document.getElementById('quiz-start-screen');
+  const activeScreen = document.getElementById('quiz-active-screen');
+  const resultScreen = document.getElementById('quiz-result-screen');
 
-  setupSwipeCard();
-  renderQuizCard();
+  if (startScreen) startScreen.classList.add('hidden');
+  if (resultScreen) resultScreen.classList.add('hidden');
+  if (activeScreen) activeScreen.classList.remove('hidden');
+
+  renderQuestion();
 }
-window.resetQuiz = resetQuiz;
 
 /**
- * Binds mouse and touch drag listeners to the card element
+ * Render current question into HTML elements
  */
-function setupSwipeCard() {
-  cardElement = document.getElementById('quiz-card');
-  if (!cardElement) return;
+function renderQuestion() {
+  const q = quizQuestions[currentQuestionIndex];
+  if (!q) return;
 
-  // Reset transforms
-  cardElement.style.transform = 'none';
-  cardElement.style.transition = 'none';
+  // Update progress UI
+  const progressElem = document.getElementById('quiz-progress');
+  const progressBar = document.getElementById('quiz-progress-bar');
+  if (progressElem) progressElem.textContent = `Question ${currentQuestionIndex + 1} of ${quizQuestions.length}`;
+  if (progressBar) progressBar.style.width = `${((currentQuestionIndex + 1) / quizQuestions.length) * 100}%`;
 
-  // Mouse Events
-  cardElement.onmousedown = startDrag;
-  window.onmousemove = drag;
-  window.onmouseup = endDrag;
+  // Render question image
+  const imgElem = document.getElementById('quiz-image');
+  if (imgElem) {
+    imgElem.src = q.image;
+    imgElem.alt = `Verification Image ${q.id}`;
+  }
 
-  // Touch Events (Mobile)
-  cardElement.ontouchstart = (e) => startDrag(e.touches[0]);
-  window.ontouchmove = (e) => {
-    if (isSwiping) drag(e.touches[0]);
-  };
-  window.ontouchend = endDrag;
+  // Reset feedback box if exists
+  const feedbackBox = document.getElementById('quiz-feedback');
+  if (feedbackBox) {
+    feedbackBox.classList.add('hidden');
+    feedbackBox.innerHTML = '';
+  }
+
+  // Enable buttons
+  toggleChoiceButtons(true);
 }
 
-function startDrag(e) {
-  isSwiping = true;
-  startX = e.clientX;
-  if (cardElement) cardElement.style.transition = 'none';
-}
+/**
+ * Submit User Answer
+ * @param {boolean} userChoiceTrue True if user thinks it's REAL, False if AI
+ */
+function submitAnswer(userChoiceTrue) {
+  toggleChoiceButtons(false);
 
-function drag(e) {
-  if (!isSwiping || !cardElement) return;
+  const q = quizQuestions[currentQuestionIndex];
+  const isCorrect = (userChoiceTrue === q.isReal);
 
-  currentX = e.clientX - startX;
-  const rotate = currentX * 0.05; // Gentle rotation while dragging
+  userAnswers.push({
+    questionId: q.id,
+    userChoice: userChoiceTrue,
+    actualIsReal: q.isReal,
+    isCorrect: isCorrect
+  });
 
-  cardElement.style.transform = `translateX(${currentX}px) rotate(${rotate}deg)`;
-
-  // Show "REAL" or "AI" overlays dynamically based on drag direction
-  const overlayReal = document.getElementById('overlay-real');
-  const overlayAI = document.getElementById('overlay-ai');
-
-  if (currentX > 30) {
-    // Dragging Right -> REAL
-    if (overlayReal) overlayReal.style.opacity = Math.min(currentX / 100, 1);
-    if (overlayAI) overlayAI.style.opacity = '0';
-  } else if (currentX < -30) {
-    // Dragging Left -> AI
-    if (overlayAI) overlayAI.style.opacity = Math.min(Math.abs(currentX) / 100, 1);
-    if (overlayReal) overlayReal.style.opacity = '0';
+  if (isCorrect) {
+    score++;
   } else {
-    if (overlayReal) overlayReal.style.opacity = '0';
-    if (overlayAI) overlayAI.style.opacity = '0';
+    // Record mistaken image ID for Firestore logging
+    mistakenImageIds.push(q.id);
   }
-}
 
-function endDrag() {
-  if (!isSwiping) return;
-  isSwiping = false;
-
-  const threshold = 100; // Drag threshold to register decision
-
-  if (currentX > threshold) {
-    // Swiped Right -> Picked Real (false)
-    processQuizAnswer(false, 'right');
-  } else if (currentX < -threshold) {
-    // Swiped Left -> Picked AI (true)
-    processQuizAnswer(true, 'left');
-  } else {
-    // Snap back to center
-    if (cardElement) {
-      cardElement.style.transition = 'transform 0.3s ease';
-      cardElement.style.transform = 'none';
-    }
-    resetOverlays();
-  }
-  currentX = 0;
+  showInstantFeedback(isCorrect, q.explanation);
 }
 
 /**
- * Handles choice made via bottom action buttons
+ * Display immediate feedback before moving to next question
  */
-function handleSwipeChoice(guessedAI) {
-  const direction = guessedAI ? 'left' : 'right';
-  processQuizAnswer(guessedAI, direction);
-}
-window.handleSwipeChoice = handleSwipeChoice;
-
-/**
- * Evaluates user's guess and animates card exit
- */
-function processQuizAnswer(guessedAI, direction) {
-  if (currentQuizIndex >= QUIZ_DATASET.length) return;
-
-  const currentCard = QUIZ_DATASET[currentQuizIndex];
-  const isCorrect = (guessedAI === currentCard.isAI);
-
-  if (isCorrect) quizScore++;
-
-  // Animate card off screen
-  if (cardElement) {
-    cardElement.style.transition = 'transform 0.4s ease, opacity 0.4s ease';
-    const xFly = direction === 'right' ? 600 : -600;
-    const rotateFly = direction === 'right' ? 25 : -25;
-    cardElement.style.transform = `translateX(${xFly}px) rotate(${rotateFly}deg)`;
-    cardElement.style.opacity = '0';
+function showInstantFeedback(isCorrect, explanation) {
+  const feedbackBox = document.getElementById('quiz-feedback');
+  
+  if (feedbackBox) {
+    feedbackBox.classList.remove('hidden');
+    feedbackBox.className = `p-4 rounded-lg my-4 text-center font-medium ${
+      isCorrect ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-rose-100 text-rose-800 border border-rose-300'
+    }`;
+    
+    feedbackBox.innerHTML = `
+      <p class="font-bold text-lg mb-1">${isCorrect ? 'Correct!' : 'Incorrect!'}</p>
+      <p class="text-sm">${explanation || ''}</p>
+    `;
   }
 
-  // Advance to next card after animation finishes
+  // Delay before next question
   setTimeout(() => {
-    currentQuizIndex++;
-    if (currentQuizIndex < QUIZ_DATASET.length) {
-      renderQuizCard();
+    currentQuestionIndex++;
+    if (currentQuestionIndex < quizQuestions.length) {
+      renderQuestion();
     } else {
       finishQuiz();
     }
-  }, 300);
+  }, 1800);
 }
 
 /**
- * Renders the next card in the dataset
+ * Enable / Disable answer choices during feedback
  */
-function renderQuizCard() {
-  const currentCard = QUIZ_DATASET[currentQuizIndex];
-  if (!currentCard) return;
+function toggleChoiceButtons(enable) {
+  const realBtn = document.getElementById('btn-answer-real');
+  const aiBtn = document.getElementById('btn-answer-ai');
 
-  const imgEl = document.getElementById('quiz-card-img');
-  const numEl = document.getElementById('card-num');
-  const progressText = document.getElementById('quiz-progress-text');
-  const progressBar = document.getElementById('quiz-progress-bar');
-
-  if (numEl) numEl.textContent = currentQuizIndex + 1;
-  if (progressText) progressText.textContent = `${currentQuizIndex + 1} / ${QUIZ_DATASET.length}`;
-  if (progressBar) progressBar.style.width = `${((currentQuizIndex + 1) / QUIZ_DATASET.length) * 100}%`;
-
-  if (imgEl) {
-    imgEl.src = currentCard.src;
-    imgEl.onerror = function() {
-      const label = currentCard.isAI ? 'AI Synthetic' : 'Real Person';
-      this.src = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='1024' viewBox='0 0 1024 1024'><rect width='1024' height='1024' fill='%23f1f5f9'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='32' font-weight='bold' fill='%23475569'>${label}</text></svg>`;
-    };
-  }
-
-  resetOverlays();
-
-  // Reset card element position for new card
-  if (cardElement) {
-    cardElement.style.transition = 'none';
-    cardElement.style.transform = 'none';
-    cardElement.style.opacity = '1';
-  }
-}
-
-function resetOverlays() {
-  const overlayReal = document.getElementById('overlay-real');
-  const overlayAI = document.getElementById('overlay-ai');
-  if (overlayReal) overlayReal.style.opacity = '0';
-  if (overlayAI) overlayAI.style.opacity = '0';
+  if (realBtn) realBtn.disabled = !enable;
+  if (aiBtn) aiBtn.disabled = !enable;
 }
 
 /**
- * Quiz completed: Calculates percentage and saves attempt to leaderboard
+ * Finish Quiz & Save Results to Firestore via auth.js
  */
 function finishQuiz() {
-  const cardContainer = document.getElementById('quiz-card-container');
-  const quizControls = document.getElementById('quiz-controls');
-  const resultsBox = document.getElementById('quiz-results');
+  const total = quizQuestions.length;
+  const percentage = Math.round((score / total) * 100);
 
-  if (cardContainer) cardContainer.classList.add('hidden');
-  if (quizControls) quizControls.classList.add('hidden');
-  if (resultsBox) resultsBox.classList.remove('hidden');
+  // 1. Hide quiz active screen & show results
+  const activeScreen = document.getElementById('quiz-active-screen');
+  const resultScreen = document.getElementById('quiz-result-screen');
 
-  const total = QUIZ_DATASET.length;
-  const percentage = Math.round((quizScore / total) * 100);
+  if (activeScreen) activeScreen.classList.add('hidden');
+  if (resultScreen) resultScreen.classList.remove('hidden');
 
-  const scoreEl = document.getElementById('final-score');
-  const percentEl = document.getElementById('final-percentage');
+  // 2. Render Scoreboard elements
+  const scoreText = document.getElementById('quiz-final-score');
+  const percentText = document.getElementById('quiz-final-percentage');
 
-  if (scoreEl) scoreEl.textContent = `${quizScore} / ${total}`;
-  if (percentEl) percentEl.textContent = `${percentage}%`;
+  if (scoreText) scoreText.textContent = `${score} / ${total}`;
+  if (percentText) percentText.textContent = `${percentage}%`;
 
-  // Save score to local storage & leaderboard table
+  // 3. PERSIST TO CLOUD FIRESTORE
   if (typeof window.saveQuizAttempt === 'function') {
-    window.saveQuizAttempt(quizScore, total, percentage);
+    window.saveQuizAttempt(score, total, percentage, mistakenImageIds);
+  } else {
+    console.warn("saveQuizAttempt function not found on window object.");
   }
 }
 
-// Auto-initialize when navigating or page load
-document.addEventListener('DOMContentLoaded', () => {
-  resetQuiz();
-});
+// ATTACH TO WINDOW SCOPE FOR HTML CLICK HANDLERS
+window.startQuiz = startQuiz;
+window.submitAnswer = submitAnswer;
