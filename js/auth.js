@@ -20,7 +20,7 @@ import {
   updateDoc, 
   collection, 
   query, 
-  where,
+  where, 
   orderBy, 
   limit, 
   getDocs,
@@ -49,6 +49,7 @@ const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 let currentUser = null;
+let currentUsername = null;
 let userChartInstance = null;
 
 /**
@@ -57,7 +58,7 @@ let userChartInstance = null;
 getRedirectResult(auth)
   .then((result) => {
     if (result && result.user) {
-      syncUserProfile(result.user);
+      handleUserLogin(result.user);
     }
   })
   .catch((error) => console.error("Redirect Sign-in error:", error));
@@ -71,30 +72,15 @@ onAuthStateChanged(auth, async (user) => {
   const overlay = document.getElementById("chart-logged-out-overlay");
 
   if (user) {
-    currentUser = {
-      uid: user.uid,
-      displayName: user.displayName || "User",
-      email: user.email || "",
-      photoURL: user.photoURL || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80"
-    };
-
+    currentUser = user;
     if (loggedOutUI) loggedOutUI.classList.add("hidden");
     if (loggedInUI) loggedInUI.classList.remove("hidden");
     if (overlay) overlay.classList.add("hidden");
 
-    // Populate user profile UI
-    const avatar = document.getElementById("user-avatar");
-    const name = document.getElementById("user-display-name");
-    const email = document.getElementById("user-email");
-
-    if (avatar) avatar.src = currentUser.photoURL;
-    if (name) name.textContent = currentUser.displayName;
-    if (email) email.textContent = currentUser.email;
-
-    await syncUserProfile(user);
-    await loadUserStats();
+    await handleUserLogin(user);
   } else {
     currentUser = null;
+    currentUsername = null;
     if (loggedOutUI) loggedOutUI.classList.remove("hidden");
     if (loggedInUI) loggedInUI.classList.add("hidden");
     if (overlay) overlay.classList.remove("hidden");
@@ -109,6 +95,108 @@ onAuthStateChanged(auth, async (user) => {
 
   loadGlobalLeaderboard();
 });
+
+/**
+ * Manages user profile & unique username prompting
+ */
+async function handleUserLogin(user) {
+  const userRef = doc(db, "users", user.uid);
+  const snap = await getDoc(userRef);
+
+  if (snap.exists() && snap.data().username) {
+    // User already exists and has a unique username
+    currentUsername = snap.data().username;
+    updateUserProfileUI(snap.data().username, user.photoURL, user.email);
+    await loadUserStats();
+  } else {
+    // First time user or missing username: prompt modal
+    showUsernameModal(user);
+  }
+}
+
+/**
+ * Displays Username Selection Modal
+ */
+function showUsernameModal(user) {
+  const modal = document.getElementById("username-modal");
+  if (modal) modal.classList.remove("hidden");
+}
+
+/**
+ * Saves and validates unique username in Firestore
+ */
+window.submitUsernameSelection = async function() {
+  const input = document.getElementById("username-input");
+  const errorEl = document.getElementById("username-error");
+
+  if (!input || !errorEl || !currentUser) return;
+
+  const rawUsername = input.value.trim();
+  const sanitizedUsername = rawUsername.toLowerCase().replace(/[^a-z0-9_]/g, '');
+
+  if (sanitizedUsername.length < 3 || sanitizedUsername.length > 20) {
+    errorEl.textContent = "Username must be between 3 and 20 alphanumeric characters.";
+    errorEl.classList.remove("hidden");
+    return;
+  }
+
+  try {
+    // 1. Check if username is already taken in 'usernames' collection
+    const usernameRef = doc(db, "usernames", sanitizedUsername);
+    const usernameSnap = await getDoc(usernameRef);
+
+    if (usernameSnap.exists()) {
+      errorEl.textContent = "This username is already taken";
+      errorEl.classList.remove("hidden");
+      return;
+    }
+
+    // 2. Claim username in 'usernames' collection
+    await setDoc(usernameRef, { uid: currentUser.uid });
+
+    // 3. Save user doc with selected username
+    const userRef = doc(db, "users", currentUser.uid);
+    await setDoc(userRef, {
+      uid: currentUser.uid,
+      username: sanitizedUsername,
+      displayName: currentUser.displayName || sanitizedUsername,
+      email: currentUser.email || "",
+      photoURL: currentUser.photoURL || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80",
+      bestScore: 0,
+      bestPercentage: 0,
+      totalAttempts: 0,
+      mistakenImageIds: [],
+      createdAt: serverTimestamp()
+    }, { merge: true });
+
+    currentUsername = sanitizedUsername;
+    errorEl.classList.add("hidden");
+    
+    const modal = document.getElementById("username-modal");
+    if (modal) modal.classList.add("hidden");
+
+    updateUserProfileUI(sanitizedUsername, currentUser.photoURL, currentUser.email);
+    await loadUserStats();
+
+  } catch (err) {
+    console.error("Error setting username:", err);
+    errorEl.textContent = "Failed to reserve username. Please try again.";
+    errorEl.classList.remove("hidden");
+  }
+};
+
+/**
+ * Updates UI with current account information
+ */
+function updateUserProfileUI(username, photoURL, email) {
+  const avatar = document.getElementById("user-avatar");
+  const name = document.getElementById("user-display-name");
+  const emailEl = document.getElementById("user-email");
+
+  if (avatar) avatar.src = photoURL || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80";
+  if (name) name.textContent = `@${username}`;
+  if (emailEl) emailEl.textContent = email || "";
+}
 
 /**
  * Google Sign In Handler
@@ -168,34 +256,17 @@ window.addEventListener("click", (e) => {
 });
 
 /**
- * Sync profile to Firestore
- */
-async function syncUserProfile(user) {
-  const userRef = doc(db, "users", user.uid);
-  const snap = await getDoc(userRef);
-
-  if (!snap.exists()) {
-    await setDoc(userRef, {
-      uid: user.uid,
-      displayName: user.displayName || "Anonymous User",
-      email: user.email || "",
-      photoURL: user.photoURL || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80",
-      bestScore: 0,
-      bestPercentage: 0,
-      totalAttempts: 0,
-      mistakenImageIds: [],
-      createdAt: serverTimestamp()
-    });
-  }
-}
-
-/**
- * Save Quiz Attempt to Firestore
+ * Save Quiz Attempt to Firestore bound to user's UNIQUE USERNAME
  */
 export async function saveQuizAttempt(score, total, percentage, mistakenIds = []) {
+  if (!currentUsername) {
+    console.warn("Attempt saved as guest: No username bound.");
+  }
+
   const attemptData = {
     uid: currentUser ? currentUser.uid : "guest",
-    displayName: currentUser ? currentUser.displayName : "Guest User",
+    username: currentUsername || "guest",
+    displayName: currentUsername ? `@${currentUsername}` : "Guest User",
     photoURL: currentUser ? currentUser.photoURL : "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80",
     score: score,
     total: total,
@@ -207,7 +278,7 @@ export async function saveQuizAttempt(score, total, percentage, mistakenIds = []
   try {
     await addDoc(collection(db, "quiz_attempts"), attemptData);
 
-    if (currentUser) {
+    if (currentUser && currentUsername) {
       const userRef = doc(db, "users", currentUser.uid);
       const userSnap = await getDoc(userRef);
 
@@ -258,21 +329,22 @@ async function loadUserStats() {
 }
 
 /**
- * Fetch and Render Performance Chart from Firestore
- * Maps Attempts on X-Axis and Percentage (%) on Y-Axis
+ * Fetch and Render Performance Chart from Firestore BY USERNAME
+ * Queries quiz_attempts collection where username == currentUsername
  */
 async function loadUserPerformanceChart() {
   const canvas = document.getElementById("user-performance-chart") || document.getElementById("performanceChart");
   const overlay = document.getElementById("chart-logged-out-overlay");
 
-  if (!canvas || !currentUser) return;
+  if (!canvas || !currentUsername) return;
   if (overlay) overlay.classList.add("hidden");
 
   try {
     const attemptsRef = collection(db, "quiz_attempts");
+    // Search specifically for attempts matching the distinct username
     const q = query(
       attemptsRef, 
-      where("uid", "==", currentUser.uid), 
+      where("username", "==", currentUsername), 
       orderBy("timestamp", "asc")
     );
 
@@ -294,7 +366,7 @@ async function loadUserPerformanceChart() {
       scores.length > 0 ? scores : [0]
     );
   } catch (error) {
-    console.error("Error loading performance chart:", error);
+    console.error("Error loading performance chart by username:", error);
   }
 }
 
@@ -315,7 +387,7 @@ function renderDemoChart() {
 }
 
 /**
- * Universal Chart.js Renderer (Attempts on X, % on Y)
+ * Universal Chart.js Renderer
  */
 function renderChartInstance(canvas, labels, scores) {
   if (!canvas || typeof Chart === "undefined") return;
@@ -380,7 +452,7 @@ function renderChartInstance(canvas, labels, scores) {
 }
 
 /**
- * Load Global Leaderboard from Cloud Firestore
+ * Load Global Leaderboard from Cloud Firestore displaying Usernames
  */
 async function loadGlobalLeaderboard() {
   const tbody = document.getElementById("leaderboard-table-body");
@@ -405,7 +477,7 @@ async function loadGlobalLeaderboard() {
           <td class="py-3 px-4 font-bold text-slate-700">#${rank++}</td>
           <td class="py-3 px-4 flex items-center gap-3">
             <img src="${user.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80'}" class="w-8 h-8 rounded-full border object-cover">
-            <span class="font-semibold text-slate-900">${user.displayName || 'Anonymous'}</span>
+            <span class="font-semibold text-slate-900">@${user.username || 'anonymous'}</span>
           </td>
           <td class="py-3 px-4 font-bold text-indigo-600">${user.bestScore || 0}</td>
           <td class="py-3 px-4 font-bold text-emerald-600">${user.bestPercentage || 0}%</td>
@@ -421,7 +493,7 @@ async function loadGlobalLeaderboard() {
   }
 }
 
-// Global window attachments
+// Global exports
 window.saveQuizAttempt = saveQuizAttempt;
 window.saveQuizScore = saveQuizAttempt;
 window.loadGlobalLeaderboard = loadGlobalLeaderboard;
