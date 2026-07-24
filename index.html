@@ -20,38 +20,43 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <style>
-    body {
-      font-family: 'Inter', sans-serif;
-    }
+    body { font-family: 'Inter', sans-serif; }
+    .page-section { display: none; }
+    .page-section.active { display: block; }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col justify-between">
 
-  <!-- GLOBAL NAVIGATION HEADER -->
-  <header class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200">
+  <!-- HEADER -->
+  <header class="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between h-16">
         
         <!-- LOGO -->
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 cursor-pointer" onclick="showPage('landing')">
           <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-md shadow-indigo-200">
             VF
           </div>
           <span class="text-xl font-extrabold text-slate-900 tracking-tight">VeriFace <span class="text-indigo-600">AI</span></span>
         </div>
 
-        <!-- AUTH NAVIGATION CONTROLS -->
+        <!-- NAVIGATION -->
+        <nav class="hidden md:flex items-center gap-1 text-sm font-semibold text-slate-600">
+          <button onclick="showPage('landing')" class="px-3 py-2 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition-colors">Home</button>
+          <button onclick="showPage('learning')" class="px-3 py-2 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition-colors">Learning Center</button>
+          <button onclick="showPage('quiz')" class="px-3 py-2 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition-colors">Verification Quiz</button>
+          <button onclick="showPage('dashboard')" class="px-3 py-2 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition-colors">Dashboard & Leaderboard</button>
+        </nav>
+
+        <!-- AUTH BUTTONS -->
         <div class="flex items-center gap-4">
-          
-          <!-- LOGGED OUT STATE BUTTON -->
           <div id="auth-logged-out">
             <button onclick="loginWithGoogle()" class="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm px-4 py-2 rounded-lg transition-all shadow-sm">
               <i class="fa-brands fa-google text-xs"></i>
-              <span>Sign in with Google</span>
+              <span>Sign in</span>
             </button>
           </div>
 
-          <!-- LOGGED IN STATE PROFILE -->
           <div id="auth-logged-in" class="hidden flex items-center gap-3">
             <img id="user-avatar" src="" alt="User Profile" class="w-9 h-9 rounded-full border border-slate-300 object-cover bg-slate-200">
             <div class="hidden sm:block text-left">
@@ -62,36 +67,162 @@
               <i class="fa-solid fa-right-from-bracket"></i>
             </button>
           </div>
-
         </div>
 
       </div>
     </div>
   </header>
 
-  <!-- MAIN APPLICATION BODY -->
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow w-full space-y-10">
+  <!-- MAIN SUBPAGE CONTAINER -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow w-full">
 
-    <!-- HERO / DASHBOARD STATS SECTION -->
-    <section id="dashboard-section" class="space-y-6">
-      
-      <!-- HERO BANNER -->
-      <div class="bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
+    <!-- 1. LANDING PAGE SUBPAGE -->
+    <section id="page-landing" class="page-section active space-y-12">
+      <div class="bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 rounded-3xl p-8 sm:p-12 text-white shadow-xl relative overflow-hidden">
         <div class="relative z-10 max-w-2xl">
-          <span class="bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider mb-4 inline-block">Interactive Detection Suite</span>
-          <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight mb-3">Master Real vs. Synthetic Face Detection</h1>
-          <p class="text-indigo-200 text-sm sm:text-base leading-relaxed mb-6">Train your visual perception, take interactive quizzes, and track your progress in detecting AI-generated synthetic faces.</p>
+          <span class="bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider mb-4 inline-block">Deepfake Detection Platform</span>
+          <h1 class="text-4xl sm:text-5xl font-extrabold tracking-tight mb-4 leading-tight">Train Your Mind to Spot AI-Generated Faces</h1>
+          <p class="text-indigo-200 text-base sm:text-lg leading-relaxed mb-8">As generative AI evolves, distinguishing human faces from synthetic renders is a crucial skill. Learn key visual artifacts and test your detection accuracy.</p>
           
-          <button onclick="document.getElementById('quiz-section').scrollIntoView({ behavior: 'smooth' })" class="bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-sm px-6 py-3 rounded-xl transition-all shadow-lg shadow-indigo-900/50">
-            Start Verification Quiz
+          <div class="flex flex-wrap gap-4">
+            <button onclick="showPage('quiz')" class="bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-sm px-6 py-3.5 rounded-xl transition-all shadow-lg shadow-indigo-900/50">
+              Take the Quiz
+            </button>
+            <button onclick="showPage('learning')" class="bg-white/10 hover:bg-white/20 text-white border border-white/20 font-bold text-sm px-6 py-3.5 rounded-xl transition-all">
+              Explore Learning Guide
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center font-bold text-xl">
+            <i class="fa-solid fa-graduation-cap"></i>
+          </div>
+          <h3 class="text-lg font-bold text-slate-900">Structured Learning</h3>
+          <p class="text-sm text-slate-600">Understand common generative AI glitches including asymmetric pupils, hair rendering errors, and unnatural background distortions.</p>
+        </div>
+
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center font-bold text-xl">
+            <i class="fa-solid fa-vial"></i>
+          </div>
+          <h3 class="text-lg font-bold text-slate-900">Interactive Testing</h3>
+          <p class="text-sm text-slate-600">Test your perception against a dataset of real human portrait photography and synthetic generative models.</p>
+        </div>
+
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center font-bold text-xl">
+            <i class="fa-solid fa-chart-line"></i>
+          </div>
+          <h3 class="text-lg font-bold text-slate-900">Live Community Leaderboard</h3>
+          <p class="text-sm text-slate-600">Sign in to record your attempts, track accuracy over time, and compete on the global leaderboard.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. LEARNING CENTER SUBPAGE -->
+    <section id="page-learning" class="page-section space-y-8">
+      <div>
+        <h2 class="text-3xl font-extrabold text-slate-900 mb-2">Synthetic Media Identification Guide</h2>
+        <p class="text-slate-600 text-sm sm:text-base">Generative adversarial networks (GANs) and diffusion models leave subtle visual cues. Here is what to analyze when assessing authenticity.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Artifact #1</span>
+          <h3 class="text-lg font-bold text-slate-900">Eyes & Pupil Geometry</h3>
+          <p class="text-slate-600 text-sm">AI models often struggle with fine iris textures, catchlight consistency between both eyes, or produce misshapen pupils.</p>
+        </div>
+
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Artifact #2</span>
+          <h3 class="text-lg font-bold text-slate-900">Hair Structure & Fine Details</h3>
+          <p class="text-slate-600 text-sm">Individual hair strands on synthetic images frequently melt together, blur into the skin, or form helmet-like shapes.</p>
+        </div>
+
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Artifact #3</span>
+          <h3 class="text-lg font-bold text-slate-900">Ears, Jewelry & Accessories</h3>
+          <p class="text-slate-600 text-sm">Asymmetry is common in AI portraits: mismatched earrings, glasses frames that dissolve into the temple, or strange ear folds.</p>
+        </div>
+
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Artifact #4</span>
+          <h3 class="text-lg font-bold text-slate-900">Background Coherence</h3>
+          <p class="text-slate-600 text-sm">Background textures behind synthetic faces often feature surreal blur artifacts, floating objects, or unnatural light sources.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. VERIFICATION QUIZ SUBPAGE -->
+    <section id="page-quiz" class="page-section bg-white rounded-2xl shadow-sm border border-slate-200 p-8 min-h-[480px]">
+      
+      <!-- START SCREEN -->
+      <div id="quiz-start-screen" class="text-center py-12 max-w-lg mx-auto">
+        <div class="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
+          <i class="fa-solid fa-bullseye"></i>
+        </div>
+        <h2 class="text-2xl font-bold text-slate-900 mb-2">Ready to Test Your Eye?</h2>
+        <p class="text-slate-600 text-sm mb-6">Determine whether each photo is real or synthetic AI-generated media.</p>
+        <button id="btn-start-quiz" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm px-8 py-3 rounded-xl transition-all shadow-md">
+          Begin Assessment
+        </button>
+      </div>
+
+      <!-- ACTIVE SCREEN -->
+      <div id="quiz-active-screen" class="hidden space-y-6 max-w-2xl mx-auto">
+        <div class="flex items-center justify-between text-xs font-bold text-slate-500">
+          <span id="quiz-progress">Question 1 of 10</span>
+          <div class="w-48 bg-slate-100 h-2 rounded-full overflow-hidden">
+            <div id="quiz-progress-bar" class="bg-indigo-600 h-full w-0 transition-all duration-300"></div>
+          </div>
+        </div>
+
+        <div class="bg-slate-100 rounded-xl overflow-hidden aspect-square max-w-md mx-auto relative border border-slate-200 shadow-inner">
+          <img id="quiz-image" src="" alt="Verification Subject" class="w-full h-full object-cover">
+        </div>
+
+        <div id="quiz-feedback" class="hidden text-center text-sm font-semibold p-3 rounded-xl"></div>
+
+        <div class="grid grid-cols-2 gap-4 max-w-md mx-auto">
+          <button id="btn-answer-real" class="py-3 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-sm">
+            <i class="fa-solid fa-user-check mr-2"></i> Real Person
+          </button>
+          <button id="btn-answer-ai" class="py-3 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all shadow-sm">
+            <i class="fa-solid fa-robot mr-2"></i> AI Generated
           </button>
         </div>
       </div>
 
-      <!-- METRICS & CHART GRID -->
+      <!-- RESULT SCREEN -->
+      <div id="quiz-result-screen" class="hidden text-center py-12 max-w-lg mx-auto">
+        <div class="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
+          <i class="fa-solid fa-square-poll-vertical"></i>
+        </div>
+        <h2 class="text-2xl font-bold text-slate-900 mb-2">Quiz Complete!</h2>
+        <p class="text-slate-600 text-sm mb-4">Your score has been logged to your account profile.</p>
+
+        <div class="bg-slate-50 p-6 rounded-xl border border-slate-200 max-w-xs mx-auto mb-6">
+          <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Final Score</p>
+          <h3 id="quiz-final-score" class="text-3xl font-black text-slate-900 mb-1">0 / 0</h3>
+          <p id="quiz-final-percentage" class="text-sm font-bold text-emerald-600">0%</p>
+        </div>
+
+        <button id="btn-restart-quiz" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm px-8 py-3 rounded-xl transition-all shadow-md">
+          Try Again
+        </button>
+      </div>
+
+    </section>
+
+    <!-- 4. DASHBOARD & LEADERBOARD SUBPAGE -->
+    <section id="page-dashboard" class="page-section space-y-10">
+      
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        <!-- LEFT METRIC CARDS -->
+        <!-- STAT CARDS -->
         <div class="space-y-6">
           <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4">
             <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center font-bold text-xl">
@@ -114,28 +245,25 @@
           </div>
         </div>
 
-        <!-- PERFORMANCE CHART CONTAINER -->
+        <!-- PERFORMANCE CHART -->
         <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden">
           <div class="flex items-center justify-between mb-4">
             <div>
-              <h3 class="text-lg font-bold text-slate-900">Performance Over Time</h3>
-              <p class="text-xs text-slate-500">Track your accuracy improvement across quiz attempts</p>
+              <h3 class="text-lg font-bold text-slate-900">Performance History</h3>
+              <p class="text-xs text-slate-500">Track your score across past quiz attempts</p>
             </div>
           </div>
 
-          <!-- GRAPH CONTAINER WITH OVERLAY -->
           <div class="relative w-full h-72">
-            <!-- CHART CANVAS -->
-            <canvas id="user-performance-chart" class="w-full h-full transition-all duration-300"></canvas>
+            <canvas id="user-performance-chart" class="w-full h-full"></canvas>
 
-            <!-- LOGGED-OUT DEMO OVERLAY -->
-            <div id="chart-logged-out-overlay" class="absolute inset-0 bg-slate-900/10 backdrop-blur-md flex flex-col items-center justify-center text-center p-6 rounded-xl transition-all duration-300">
-              <div class="w-12 h-12 bg-indigo-600 text-white rounded-full flex items-center justify-center mb-3 shadow-lg shadow-indigo-500/30">
+            <div id="chart-logged-out-overlay" class="absolute inset-0 bg-slate-900/10 backdrop-blur-md flex flex-col items-center justify-center text-center p-6 rounded-xl">
+              <div class="w-12 h-12 bg-indigo-600 text-white rounded-full flex items-center justify-center mb-3 shadow-lg">
                 <i class="fa-solid fa-lock text-lg"></i>
               </div>
-              <h4 class="text-base font-bold text-slate-900 mb-1">Personal Progress Tracking Locked</h4>
-              <p class="text-xs text-slate-600 mb-4 max-w-xs">To track and see your performance over time please login — it's entirely free!</p>
-              <button onclick="loginWithGoogle()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-all shadow-md hover:shadow-lg">
+              <h4 class="text-base font-bold text-slate-900 mb-1">Personal Tracking Locked</h4>
+              <p class="text-xs text-slate-600 mb-4 max-w-xs">Sign in to record quiz attempt history and visualize performance analytics.</p>
+              <button onclick="loginWithGoogle()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-all shadow-md">
                 Sign in with Google
               </button>
             </div>
@@ -144,122 +272,61 @@
 
       </div>
 
-    </section>
-
-    <!-- QUIZ SECTION CONTAINER -->
-    <section id="quiz-section" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 min-h-[450px]">
-      
-      <!-- QUIZ START SCREEN -->
-      <div id="quiz-start-screen" class="text-center py-12 max-w-lg mx-auto">
-        <div class="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
-          <i class="fa-solid fa-bullseye"></i>
-        </div>
-        <h2 class="text-2xl font-bold text-slate-900 mb-2">Ready to Test Your Eye?</h2>
-        <p class="text-slate-600 text-sm mb-6">You will be presented with 20 faces. Determine whether each photo is real or synthetic AI-generated media.</p>
-        <button onclick="if(typeof window.dataset !== 'undefined') { startQuiz(window.dataset); }" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm px-8 py-3 rounded-xl transition-all shadow-md">
-          Begin Assessment
-        </button>
-      </div>
-
-      <!-- QUIZ ACTIVE SCREEN -->
-      <div id="quiz-active-screen" class="hidden space-y-6 max-w-2xl mx-auto">
-        <!-- PROGRESS HEADER -->
-        <div class="flex items-center justify-between text-xs font-bold text-slate-500">
-          <span id="quiz-progress">Question 1 of 20</span>
-          <div class="w-48 bg-slate-100 h-2 rounded-full overflow-hidden">
-            <div id="quiz-progress-bar" class="bg-indigo-600 h-full w-0 transition-all duration-300"></div>
-          </div>
+      <!-- FIRESTORE GLOBAL LEADERBOARD -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+        <div class="mb-6">
+          <h3 class="text-lg font-bold text-slate-900">Global Leaderboard</h3>
+          <p class="text-xs text-slate-500">Real-time ranking of top players from Firestore</p>
         </div>
 
-        <!-- IMAGE DISPLAY CARD -->
-        <div class="bg-slate-100 rounded-xl overflow-hidden aspect-square max-w-md mx-auto relative border border-slate-200 shadow-inner">
-          <img id="quiz-image" src="" alt="Verification Subject" class="w-full h-full object-cover">
-        </div>
-
-        <!-- FEEDBACK NOTIFICATION AREA -->
-        <div id="quiz-feedback" class="hidden"></div>
-
-        <!-- CHOICE BUTTONS -->
-        <div class="grid grid-cols-2 gap-4 max-w-md mx-auto">
-          <button id="btn-answer-real" onclick="submitAnswer(true)" class="py-3 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-sm">
-            <i class="fa-solid fa-user-check mr-2"></i> Real Person
-          </button>
-          <button id="btn-answer-ai" onclick="submitAnswer(false)" class="py-3 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all shadow-sm">
-            <i class="fa-solid fa-robot mr-2"></i> AI Generated
-          </button>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm text-slate-600">
+            <thead class="bg-slate-50 text-slate-400 font-semibold text-xs uppercase border-b border-slate-200">
+              <tr>
+                <th class="py-3 px-4">Rank</th>
+                <th class="py-3 px-4">User</th>
+                <th class="py-3 px-4">Best Score</th>
+                <th class="py-3 px-4">Accuracy</th>
+                <th class="py-3 px-4">Attempts</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboard-table-body">
+              <tr>
+                <td colspan="5" class="text-center py-8 text-slate-400">
+                  <i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading leaderboard...
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
-      <!-- QUIZ RESULT SCREEN -->
-      <div id="quiz-result-screen" class="hidden text-center py-12 max-w-lg mx-auto">
-        <div class="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
-          <i class="fa-solid fa-square-poll-vertical"></i>
-        </div>
-        <h2 class="text-2xl font-bold text-slate-900 mb-2">Quiz Complete!</h2>
-        <p class="text-slate-600 text-sm mb-4">Your answers have been analyzed and synced to your profile.</p>
-
-        <div class="bg-slate-50 p-6 rounded-xl border border-slate-200 max-w-xs mx-auto mb-6">
-          <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Final Score</p>
-          <h3 id="quiz-final-score" class="text-3xl font-black text-slate-900 mb-1">0 / 20</h3>
-          <p id="quiz-final-percentage" class="text-sm font-bold text-emerald-600">0%</p>
-        </div>
-
-        <button onclick="startQuiz(window.dataset)" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm px-8 py-3 rounded-xl transition-all shadow-md">
-          Try Again
-        </button>
-      </div>
-
-    </section>
-
-    <!-- GLOBAL LEADERBOARD SECTION -->
-    <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-      <div class="mb-6">
-        <h3 class="text-lg font-bold text-slate-900">Global Leaderboard</h3>
-        <p class="text-xs text-slate-500">Top verifiers across the community</p>
-      </div>
-
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-sm text-slate-600">
-          <thead class="bg-slate-50 text-slate-400 font-semibold text-xs uppercase border-b border-slate-200">
-            <tr>
-              <th class="py-3 px-4">Rank</th>
-              <th class="py-3 px-4">User</th>
-              <th class="py-3 px-4">Best Score</th>
-              <th class="py-3 px-4">Accuracy</th>
-              <th class="py-3 px-4">Attempts</th>
-            </tr>
-          </thead>
-          <tbody id="leaderboard-table-body">
-            <!-- Dynamic Firestore records will populate here -->
-            <tr>
-              <td colspan="5" class="text-center py-8 text-slate-400">
-                <i class="fa-solid fa-spinner fa-spin mr-2"></i> Connecting to Cloud Firestore...
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
     </section>
 
   </main>
 
-  <!-- GLOBAL FOOTER -->
   <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-400">
     <p>&copy; 2026 VeriFace AI. Educational synthetic media verification platform.</p>
   </footer>
 
-  <!-- SCRIPT IMPORTS -->
+  <script>
+    function showPage(pageId) {
+      document.querySelectorAll('.page-section').forEach(sec => sec.classList.remove('active'));
+      const activeSection = document.getElementById('page-' + pageId);
+      if (activeSection) activeSection.classList.add('active');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  </script>
+
   <!-- Firebase Modular SDKs -->
   <script type="module" src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js"></script>
   <script type="module" src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js"></script>
   <script type="module" src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"></script>
 
-  <!-- Application Scripts -->
+  <!-- App logic files -->
   <script type="module" src="js/auth.js"></script>
   <script src="js/dataset.js"></script>
-  <script src="js/training.js"></script>
   <script src="js/quiz.js"></script>
-  <script src="js/app.js"></script>
-
+  <script type="module" src="js/app.js"></script>
 </body>
 </html>

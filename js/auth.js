@@ -5,14 +5,11 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { 
   getAuth, 
-  signInWithPopup, 
-  signInWithRedirect,
-  getRedirectResult,
   GoogleAuthProvider, 
+  signInWithPopup, 
   signOut, 
   onAuthStateChanged 
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-
 import { 
   getFirestore, 
   doc, 
@@ -20,14 +17,12 @@ import {
   setDoc, 
   updateDoc, 
   collection, 
-  addDoc, 
   query, 
-  where,
   orderBy, 
   limit, 
   getDocs,
   arrayUnion,
-  increment 
+  serverTimestamp 
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // 1. FIREBASE CONFIGURATION
@@ -40,6 +35,206 @@ const firebaseConfig = {
   appId: "1:540521994574:web:f3b0da48a3d2d73e74e61f",
   measurementId: "G-E27H1ZCN27"
 };
+
+const app = initializeApp(firebaseConfig);
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+
+let currentUser = null;
+let userChartInstance = null;
+
+// Google Sign In
+window.loginWithGoogle = async function() {
+  const provider = new GoogleAuthProvider();
+  try {
+    await signInWithPopup(auth, provider);
+  } catch (error) {
+    console.error("Authentication error:", error);
+  }
+};
+
+// Logout
+window.logoutUser = async function() {
+  try {
+    await signOut(auth);
+  } catch (error) {
+    console.error("Sign out error:", error);
+  }
+};
+
+// Auth Listener
+onAuthStateChanged(auth, async (user) => {
+  const loggedOutUI = document.getElementById("auth-logged-out");
+  const loggedInUI = document.getElementById("auth-logged-in");
+  const overlay = document.getElementById("chart-logged-out-overlay");
+
+  if (user) {
+    currentUser = user;
+    if (loggedOutUI) loggedOutUI.classList.add("hidden");
+    if (loggedInUI) loggedInUI.classList.remove("hidden");
+
+    document.getElementById("user-avatar").src = user.photoURL || "https://via.placeholder.com/150";
+    document.getElementById("user-display-name").textContent = user.displayName || "User";
+    document.getElementById("user-email").textContent = user.email || "";
+
+    if (overlay) overlay.classList.add("hidden");
+
+    await syncUserData(user);
+    await loadUserDashboard(user.uid);
+  } else {
+    currentUser = null;
+    if (loggedOutUI) loggedOutUI.classList.remove("hidden");
+    if (loggedInUI) loggedInUI.classList.add("hidden");
+    if (overlay) overlay.classList.remove("hidden");
+
+    document.getElementById("stat-total-attempts").textContent = "—";
+    document.getElementById("stat-best-score").textContent = "—";
+    
+    if (userChartInstance) {
+      userChartInstance.destroy();
+      userChartInstance = null;
+    }
+  }
+
+  loadGlobalLeaderboard();
+});
+
+// Sync Profile to Firestore
+async function syncUserData(user) {
+  const userRef = doc(db, "users", user.uid);
+  const snap = await getDoc(userRef);
+
+  if (!snap.exists()) {
+    await setDoc(userRef, {
+      displayName: user.displayName || "Anonymous",
+      photoURL: user.photoURL || "",
+      email: user.email,
+      bestScore: 0,
+      bestPercentage: 0,
+      totalAttempts: 0,
+      scoresHistory: [],
+      createdAt: serverTimestamp()
+    });
+  }
+}
+
+// Record Quiz Attempt
+export async function saveQuizScore(score, totalQuestions) {
+  if (!currentUser) return;
+
+  const percentage = Math.round((score / totalQuestions) * 100);
+  const userRef = doc(db, "users", currentUser.uid);
+  const snap = await getDoc(userRef);
+
+  if (snap.exists()) {
+    const data = snap.data();
+    const currentBest = data.bestPercentage || 0;
+    const newBest = Math.max(currentBest, percentage);
+    const newBestScore = Math.max(data.bestScore || 0, score);
+
+    await updateDoc(userRef, {
+      totalAttempts: (data.totalAttempts || 0) + 1,
+      bestScore: newBestScore,
+      bestPercentage: newBest,
+      scoresHistory: arrayUnion({
+        score,
+        totalQuestions,
+        percentage,
+        date: new Date().toISOString()
+      })
+    });
+
+    await loadUserDashboard(currentUser.uid);
+    await loadGlobalLeaderboard();
+  }
+}
+
+// Load Dashboard Data
+async function loadUserDashboard(uid) {
+  const userRef = doc(db, "users", uid);
+  const snap = await getDoc(userRef);
+
+  if (snap.exists()) {
+    const data = snap.data();
+    document.getElementById("stat-total-attempts").textContent = data.totalAttempts || 0;
+    document.getElementById("stat-best-score").textContent = `${data.bestPercentage || 0}%`;
+
+    renderChart(data.scoresHistory || []);
+  }
+}
+
+// Render Performance Chart
+function renderChart(history) {
+  const ctx = document.getElementById("user-performance-chart").getContext("2d");
+
+  if (userChartInstance) userChartInstance.destroy();
+
+  const labels = history.map((_, i) => `Attempt ${i + 1}`);
+  const scores = history.map(h => h.percentage);
+
+  userChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels.length ? labels : ['No Data'],
+      datasets: [{
+        label: 'Accuracy (%)',
+        data: scores.length ? scores : [0],
+        borderColor: '#4f46e5',
+        backgroundColor: 'rgba(79, 70, 229, 0.1)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: { min: 0, max: 100 }
+      }
+    }
+  });
+}
+
+// Load Global Leaderboard
+async function loadGlobalLeaderboard() {
+  const tbody = document.getElementById("leaderboard-table-body");
+  if (!tbody) return;
+
+  try {
+    const q = query(collection(db, "users"), orderBy("bestPercentage", "desc"), limit(10));
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+      tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-400">No attempts recorded yet. Be the first!</td></tr>`;
+      return;
+    }
+
+    let rows = "";
+    let rank = 1;
+
+    snapshot.forEach((docSnap) => {
+      const user = docSnap.data();
+      rows += `
+        <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+          <td class="py-3 px-4 font-bold text-slate-700">#${rank++}</td>
+          <td class="py-3 px-4 flex items-center gap-3">
+            <img src="${user.photoURL || 'https://via.placeholder.com/150'}" class="w-8 h-8 rounded-full border object-cover">
+            <span class="font-semibold text-slate-900">${user.displayName || 'Anonymous'}</span>
+          </td>
+          <td class="py-3 px-4 font-bold text-indigo-600">${user.bestScore || 0}</td>
+          <td class="py-3 px-4 font-bold text-emerald-600">${user.bestPercentage || 0}%</td>
+          <td class="py-3 px-4 text-slate-500">${user.totalAttempts || 0}</td>
+        </tr>
+      `;
+    });
+
+    tbody.innerHTML = rows;
+  } catch (err) {
+    console.error("Leaderboard error:", err);
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-rose-500">Failed to load leaderboard data.</td></tr>`;
+  }
+}
 
 // 2. INITIALIZE SERVICES
 const app = initializeApp(firebaseConfig);
