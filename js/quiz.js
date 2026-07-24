@@ -1,32 +1,35 @@
 /* ========================================================
-   QUIZ ENGINE & FIRESTORE INTEGRATION
+   QUIZ ENGINE & TINDER-STYLE CARD SWIPE INTEGRATION
    ======================================================== */
 
-// Global Quiz State
 let quizQuestions = [];
 let currentQuestionIndex = 0;
 let score = 0;
-let userAnswers = [];
 let mistakenImageIds = [];
+
+// Drag State Management
+let isDragging = false;
+let startX = 0;
+let currentX = 0;
+const SWIPE_THRESHOLD = 100; // Pixels needed to register a swipe decision
 
 /**
  * Initialize Quiz with a dataset of questions
- * @param {Array} dataset Array of question objects: { id, image, isReal, explanation }
  */
 function startQuiz(dataset) {
-  if (!dataset || dataset.length === 0) {
-    console.error("No dataset provided to start the quiz.");
+  const sourceData = dataset || window.QUIZ_DATASET;
+  if (!sourceData || sourceData.length === 0) {
+    console.error("No dataset available to start quiz.");
     return;
   }
 
-  // Shuffle and reset state
-  quizQuestions = [...dataset].sort(() => Math.random() - 0.5).slice(0, 20); // Pick 20 questions
+  // Pick 20 questions randomly from dataset
+  quizQuestions = [...sourceData].sort(() => Math.random() - 0.5).slice(0, 20);
   currentQuestionIndex = 0;
   score = 0;
-  userAnswers = [];
   mistakenImageIds = [];
 
-  // Toggle screens
+  // Screen Toggle
   const startScreen = document.getElementById('quiz-start-screen');
   const activeScreen = document.getElementById('quiz-active-screen');
   const resultScreen = document.getElementById('quiz-result-screen');
@@ -35,136 +38,206 @@ function startQuiz(dataset) {
   if (resultScreen) resultScreen.classList.add('hidden');
   if (activeScreen) activeScreen.classList.remove('hidden');
 
-  renderQuestion();
+  renderCardStack();
 }
 
 /**
- * Render current question into HTML elements
+ * Renders the top card and sets up drag/touch listeners
  */
-function renderQuestion() {
+function renderCardStack() {
   const q = quizQuestions[currentQuestionIndex];
-  if (!q) return;
+  if (!q) {
+    finishQuiz();
+    return;
+  }
 
   // Update progress UI
   const progressElem = document.getElementById('quiz-progress');
   const progressBar = document.getElementById('quiz-progress-bar');
-  if (progressElem) progressElem.textContent = `Question ${currentQuestionIndex + 1} of ${quizQuestions.length}`;
+  if (progressElem) progressElem.textContent = `Card ${currentQuestionIndex + 1} of ${quizQuestions.length}`;
   if (progressBar) progressBar.style.width = `${((currentQuestionIndex + 1) / quizQuestions.length) * 100}%`;
 
-  // Render question image
-  const imgElem = document.getElementById('quiz-image');
-  if (imgElem) {
-    imgElem.src = q.image;
-    imgElem.alt = `Verification Image ${q.id}`;
+  // Render Image and Reset Overlay Badges
+  const cardImg = document.getElementById('swipe-card-img');
+  const realBadge = document.getElementById('badge-swipe-real');
+  const aiBadge = document.getElementById('badge-swipe-ai');
+  const card = document.getElementById('swipe-card');
+
+  if (cardImg) {
+    cardImg.src = q.src;
+    cardImg.alt = `Verification Subject ${q.id || currentQuestionIndex + 1}`;
   }
 
-  // Reset feedback box if exists
+  if (realBadge) realBadge.style.opacity = '0';
+  if (aiBadge) aiBadge.style.opacity = '0';
+
+  if (card) {
+    card.style.transform = 'translateX(0px) rotate(0deg)';
+    card.style.transition = 'none';
+    attachCardListeners(card);
+  }
+
+  // Hide instant feedback box if visible
   const feedbackBox = document.getElementById('quiz-feedback');
-  if (feedbackBox) {
-    feedbackBox.classList.add('hidden');
-    feedbackBox.innerHTML = '';
-  }
-
-  // Enable buttons
-  toggleChoiceButtons(true);
+  if (feedbackBox) feedbackBox.classList.add('hidden');
 }
 
 /**
- * Submit User Answer
- * @param {boolean} userChoiceTrue True if user thinks it's REAL, False if AI
+ * Attach Mouse and Touch listeners for Tinder-style drag gesture
  */
-function submitAnswer(userChoiceTrue) {
-  toggleChoiceButtons(false);
+function attachCardListeners(card) {
+  // Remove prior listeners by cloning node or directly binding pointer events
+  card.onmousedown = startDrag;
+  card.ontouchstart = startDrag;
+}
 
+function startDrag(e) {
+  isDragging = true;
+  startX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+  currentX = startX;
+
+  document.onmousemove = onDrag;
+  document.ontouchmove = onDrag;
+  document.onmouseup = endDrag;
+  document.ontouchend = endDrag;
+}
+
+function onDrag(e) {
+  if (!isDragging) return;
+
+  const x = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+  const deltaX = x - startX;
+  currentX = x;
+
+  const card = document.getElementById('swipe-card');
+  const realBadge = document.getElementById('badge-swipe-real');
+  const aiBadge = document.getElementById('badge-swipe-ai');
+
+  if (card) {
+    const rotate = deltaX * 0.08;
+    card.style.transform = `translateX(${deltaX}px) rotate(${rotate}deg)`;
+  }
+
+  // Opacity of visual feedback overlays
+  if (deltaX < 0) {
+    // Left Swipe -> REAL
+    if (realBadge) realBadge.style.opacity = Math.min(Math.abs(deltaX) / SWIPE_THRESHOLD, 1);
+    if (aiBadge) aiBadge.style.opacity = '0';
+  } else {
+    // Right Swipe -> AI
+    if (aiBadge) aiBadge.style.opacity = Math.min(Math.abs(deltaX) / SWIPE_THRESHOLD, 1);
+    if (realBadge) realBadge.style.opacity = '0';
+  }
+}
+
+function endDrag() {
+  if (!isDragging) return;
+  isDragging = false;
+
+  document.onmousemove = null;
+  document.ontouchmove = null;
+  document.onmouseup = null;
+  document.ontouchend = null;
+
+  const deltaX = currentX - startX;
+
+  if (deltaX < -SWIPE_THRESHOLD) {
+    // Swiped Left -> User Guessed REAL (false for isAI)
+    processChoice(false);
+  } else if (deltaX > SWIPE_THRESHOLD) {
+    // Swiped Right -> User Guessed AI (true for isAI)
+    processChoice(true);
+  } else {
+    // Snap back to center
+    const card = document.getElementById('swipe-card');
+    if (card) {
+      card.style.transition = 'transform 0.25s ease-out';
+      card.style.transform = 'translateX(0px) rotate(0deg)';
+    }
+  }
+}
+
+/**
+ * Handle user decision via drag OR manual buttons
+ * @param {boolean} userGuessedAI True = User thinks AI, False = Real
+ */
+function processChoice(userGuessedAI) {
   const q = quizQuestions[currentQuestionIndex];
-  const isCorrect = (userChoiceTrue === q.isReal);
+  if (!q) return;
 
-  userAnswers.push({
-    questionId: q.id,
-    userChoice: userChoiceTrue,
-    actualIsReal: q.isReal,
-    isCorrect: isCorrect
-  });
+  const isCorrect = (userGuessedAI === q.isAI);
+  const card = document.getElementById('swipe-card');
 
   if (isCorrect) {
     score++;
   } else {
-    // Record mistaken image ID for Firestore logging
-    mistakenImageIds.push(q.id);
+    mistakenImageIds.push(q.id || currentQuestionIndex);
   }
 
-  showInstantFeedback(isCorrect, q.explanation);
-}
-
-/**
- * Display immediate feedback before moving to next question
- */
-function showInstantFeedback(isCorrect, explanation) {
-  const feedbackBox = document.getElementById('quiz-feedback');
-  
-  if (feedbackBox) {
-    feedbackBox.classList.remove('hidden');
-    feedbackBox.className = `p-4 rounded-lg my-4 text-center font-medium ${
-      isCorrect ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-rose-100 text-rose-800 border border-rose-300'
-    }`;
-    
-    feedbackBox.innerHTML = `
-      <p class="font-bold text-lg mb-1">${isCorrect ? 'Correct!' : 'Incorrect!'}</p>
-      <p class="text-sm">${explanation || ''}</p>
-    `;
+  // Animate card off screen
+  if (card) {
+    card.style.transition = 'transform 0.4s ease-in, opacity 0.4s ease-in';
+    const direction = userGuessedAI ? 1000 : -1000;
+    card.style.transform = `translateX(${direction}px) rotate(${direction * 0.05}deg)`;
+    card.style.opacity = '0';
   }
 
-  // Delay before next question
+  showInstantFeedback(isCorrect, q.isAI);
+
   setTimeout(() => {
     currentQuestionIndex++;
     if (currentQuestionIndex < quizQuestions.length) {
-      renderQuestion();
+      if (card) card.style.opacity = '1';
+      renderCardStack();
     } else {
       finishQuiz();
     }
-  }, 1800);
+  }, 600);
 }
 
 /**
- * Enable / Disable answer choices during feedback
+ * Visual feedback ribbon under card
  */
-function toggleChoiceButtons(enable) {
-  const realBtn = document.getElementById('btn-answer-real');
-  const aiBtn = document.getElementById('btn-answer-ai');
+function showInstantFeedback(isCorrect, actualIsAI) {
+  const feedbackBox = document.getElementById('quiz-feedback');
+  if (!feedbackBox) return;
 
-  if (realBtn) realBtn.disabled = !enable;
-  if (aiBtn) aiBtn.disabled = !enable;
+  feedbackBox.classList.remove('hidden');
+  const actualText = actualIsAI ? 'AI Synthetic' : 'Real Person';
+
+  if (isCorrect) {
+    feedbackBox.className = 'text-center font-bold p-3 rounded-xl bg-emerald-100 text-emerald-800 border border-emerald-300';
+    feedbackBox.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> Correct! Subject is ${actualText}.`;
+  } else {
+    feedbackBox.className = 'text-center font-bold p-3 rounded-xl bg-rose-100 text-rose-800 border border-rose-300';
+    feedbackBox.innerHTML = `<i class="fa-solid fa-circle-xmark mr-1"></i> Incorrect! Subject is ${actualText}.`;
+  }
 }
 
 /**
- * Finish Quiz & Save Results to Firestore via auth.js
+ * Finish Quiz & Save Results to Firestore
  */
 function finishQuiz() {
   const total = quizQuestions.length;
   const percentage = Math.round((score / total) * 100);
 
-  // 1. Hide quiz active screen & show results
   const activeScreen = document.getElementById('quiz-active-screen');
   const resultScreen = document.getElementById('quiz-result-screen');
 
   if (activeScreen) activeScreen.classList.add('hidden');
   if (resultScreen) resultScreen.classList.remove('hidden');
 
-  // 2. Render Scoreboard elements
   const scoreText = document.getElementById('quiz-final-score');
   const percentText = document.getElementById('quiz-final-percentage');
 
   if (scoreText) scoreText.textContent = `${score} / ${total}`;
   if (percentText) percentText.textContent = `${percentage}%`;
 
-  // 3. PERSIST TO CLOUD FIRESTORE
   if (typeof window.saveQuizAttempt === 'function') {
     window.saveQuizAttempt(score, total, percentage, mistakenImageIds);
-  } else {
-    console.warn("saveQuizAttempt function not found on window object.");
   }
 }
 
-// ATTACH TO WINDOW SCOPE FOR HTML CLICK HANDLERS
+// Attach globally
 window.startQuiz = startQuiz;
-window.submitAnswer = submitAnswer;
+window.processChoice = processChoice;

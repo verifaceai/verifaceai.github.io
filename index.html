@@ -23,6 +23,12 @@
     body { font-family: 'Inter', sans-serif; }
     .page-section { display: none; }
     .page-section.active { display: block; }
+    
+    /* Swipe Card Container Fixes */
+    .swipe-card-container {
+      touch-action: pan-y;
+      user-select: none;
+    }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col justify-between">
@@ -65,7 +71,7 @@
               <i class="fa-solid fa-chevron-down text-xs text-slate-400"></i>
             </button>
 
-            <!-- Settings / User Dropdown -->
+            <!-- Dropdown Menu -->
             <div id="user-menu" class="hidden absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 py-2 z-50">
               <div class="px-4 py-3 border-b border-slate-100">
                 <p id="user-display-name" class="text-sm font-bold text-slate-900 truncate"></p>
@@ -102,7 +108,7 @@
           
           <div class="flex flex-wrap gap-4">
             <button onclick="showPage('quiz')" class="bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-sm px-6 py-3.5 rounded-xl transition-all shadow-lg shadow-indigo-900/50">
-              Take the Quiz
+              Take the Swipe Quiz
             </button>
             <button onclick="showPage('learning')" class="bg-white/10 hover:bg-white/20 text-white border border-white/20 font-bold text-sm px-6 py-3.5 rounded-xl transition-all">
               Explore Learning Guide
@@ -172,42 +178,58 @@
       </div>
     </section>
 
-    <!-- 3. VERIFICATION QUIZ SUBPAGE -->
-    <section id="page-quiz" class="page-section bg-white rounded-2xl shadow-sm border border-slate-200 p-8 min-h-[480px]">
+    <!-- 3. VERIFICATION QUIZ (TINDER-STYLE SWIPE) SUBPAGE -->
+    <section id="page-quiz" class="page-section bg-white rounded-2xl shadow-sm border border-slate-200 p-8 min-h-[520px]">
       
       <!-- START SCREEN -->
       <div id="quiz-start-screen" class="text-center py-12 max-w-lg mx-auto">
         <div class="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
-          <i class="fa-solid fa-bullseye"></i>
+          <i class="fa-solid fa-hand-pointer"></i>
         </div>
-        <h2 class="text-2xl font-bold text-slate-900 mb-2">Ready to Test Your Eye?</h2>
-        <p class="text-slate-600 text-sm mb-6">Determine whether each photo is real or synthetic AI-generated media.</p>
-        <button id="btn-start-quiz" onclick="startQuiz(QUIZ_DATASET)" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm px-8 py-3 rounded-xl transition-all shadow-md">
+        <h2 class="text-2xl font-bold text-slate-900 mb-2">20-Card Swipe Challenge</h2>
+        <p class="text-slate-600 text-sm mb-6">Swipe <strong>LEFT</strong> for Real Person, or swipe <strong>RIGHT</strong> for AI Generated face.</p>
+        <button id="btn-start-quiz" onclick="startQuiz()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm px-8 py-3 rounded-xl transition-all shadow-md">
           Begin Assessment
         </button>
       </div>
 
-      <!-- ACTIVE SCREEN -->
-      <div id="quiz-active-screen" class="hidden space-y-6 max-w-2xl mx-auto">
+      <!-- ACTIVE SCREEN (TINDER SWIPE DECK) -->
+      <div id="quiz-active-screen" class="hidden space-y-6 max-w-md mx-auto">
         <div class="flex items-center justify-between text-xs font-bold text-slate-500">
-          <span id="quiz-progress">Question 1 of 20</span>
+          <span id="quiz-progress">Card 1 of 20</span>
           <div class="w-48 bg-slate-100 h-2 rounded-full overflow-hidden">
             <div id="quiz-progress-bar" class="bg-indigo-600 h-full w-0 transition-all duration-300"></div>
           </div>
         </div>
 
-        <div class="bg-slate-100 rounded-xl overflow-hidden aspect-square max-w-md mx-auto relative border border-slate-200 shadow-inner">
-          <img id="quiz-image" src="" alt="Verification Subject" class="w-full h-full object-cover">
+        <!-- Swipe Card Shell -->
+        <div class="swipe-card-container relative aspect-square w-full mx-auto">
+          <div id="swipe-card" class="w-full h-full bg-slate-100 rounded-2xl overflow-hidden shadow-xl border border-slate-200 cursor-grab active:cursor-grabbing relative transition-transform">
+            
+            <!-- Real Badge (Left Swipe Overlay) -->
+            <div id="badge-swipe-real" class="absolute top-6 right-6 border-4 border-emerald-500 text-emerald-600 font-black text-2xl px-4 py-1.5 rounded-lg rotate-12 opacity-0 pointer-events-none z-10 bg-white/80">
+              REAL
+            </div>
+
+            <!-- AI Badge (Right Swipe Overlay) -->
+            <div id="badge-swipe-ai" class="absolute top-6 left-6 border-4 border-indigo-600 text-indigo-600 font-black text-2xl px-4 py-1.5 rounded-lg -rotate-12 opacity-0 pointer-events-none z-10 bg-white/80">
+              AI GEN
+            </div>
+
+            <img id="swipe-card-img" src="" alt="Verification Subject" class="w-full h-full object-cover pointer-events-none">
+          </div>
         </div>
 
+        <!-- Feedback Banner -->
         <div id="quiz-feedback" class="hidden text-center text-sm font-semibold p-3 rounded-xl"></div>
 
-        <div class="grid grid-cols-2 gap-4 max-w-md mx-auto">
-          <button id="btn-answer-real" onclick="submitAnswer(true)" class="py-3 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-sm">
-            <i class="fa-solid fa-user-check mr-2"></i> Real Person
+        <!-- Cue Indicators & Click Controls -->
+        <div class="grid grid-cols-2 gap-4">
+          <button onclick="processChoice(false)" class="py-3 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2">
+            <i class="fa-solid fa-arrow-left"></i> Real Person
           </button>
-          <button id="btn-answer-ai" onclick="submitAnswer(false)" class="py-3 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all shadow-sm">
-            <i class="fa-solid fa-robot mr-2"></i> AI Generated
+          <button onclick="processChoice(true)" class="py-3 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2">
+            AI Generated <i class="fa-solid fa-arrow-right"></i>
           </button>
         </div>
       </div>
@@ -218,7 +240,7 @@
           <i class="fa-solid fa-square-poll-vertical"></i>
         </div>
         <h2 class="text-2xl font-bold text-slate-900 mb-2">Quiz Complete!</h2>
-        <p class="text-slate-600 text-sm mb-4">Your score has been logged to your account profile.</p>
+        <p class="text-slate-600 text-sm mb-4">Your accuracy score has been logged to Firestore.</p>
 
         <div class="bg-slate-50 p-6 rounded-xl border border-slate-200 max-w-xs mx-auto mb-6">
           <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Final Score</p>
@@ -226,7 +248,7 @@
           <p id="quiz-final-percentage" class="text-sm font-bold text-emerald-600">0%</p>
         </div>
 
-        <button id="btn-restart-quiz" onclick="startQuiz(QUIZ_DATASET)" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm px-8 py-3 rounded-xl transition-all shadow-md">
+        <button id="btn-restart-quiz" onclick="startQuiz()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm px-8 py-3 rounded-xl transition-all shadow-md">
           Try Again
         </button>
       </div>
