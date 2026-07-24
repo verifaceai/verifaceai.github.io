@@ -1,0 +1,10 @@
+/* Card Swipe & Transition Styles */
+.swipe-card {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+  touch-action: none;
+  user-select: none;
+}
+
+.swipe-overlay {
+  transition: opacity 0.15s ease;
+}
