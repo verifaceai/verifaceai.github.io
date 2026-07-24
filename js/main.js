@@ -6,7 +6,7 @@ let testimonialsList = [];
 let currentTestimonialIndex = 0;
 let animationFrameId = null;
 let startTime = null;
-const ROTATION_DURATION = 5000; // 5 Seconds
+const ROTATION_DURATION = 10000; // 5 Seconds
 
 /**
  * Single Page Application Router

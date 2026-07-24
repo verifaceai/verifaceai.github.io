@@ -25,13 +25,15 @@ function getImagePath(type, num) {
   return `${subfolderDir}${filename}`;
 }
 
+
 // Generate the 400 Real image paths
 const REAL_DATASET = Array.from({ length: 400 }, (_, i) => {
   const id = i + 1;
+  const filename = getImageFilename('real', id);
   return {
     id: `real_${id}`,
     src: getImagePath('real', id),
-    fallbackSrc: `${getImageFilename('real', id)}`,
+    fallbackSrc: `${REAL_IMAGE_DIR}${filename}`, // ✅ Fixed: 'images/real/real_1.F.png'
     isAI: false
   };
 });
@@ -39,13 +41,37 @@ const REAL_DATASET = Array.from({ length: 400 }, (_, i) => {
 // Generate the 400 AI image paths
 const AI_DATASET = Array.from({ length: 400 }, (_, i) => {
   const id = i + 1;
+  const filename = getImageFilename('ai', id);
   return {
     id: `ai_${id}`,
     src: getImagePath('ai', id),
-    fallbackSrc: `${getImageFilename('ai', id)}`,
+    fallbackSrc: `${AI_IMAGE_DIR}${filename}`,   // ✅ Fixed: 'images/ai/ai_2.M.png'
     isAI: true
   };
 });
+
+
+// // Generate the 400 Real image paths
+// const REAL_DATASET = Array.from({ length: 400 }, (_, i) => {
+//   const id = i + 1;
+//   return {
+//     id: `real_${id}`,
+//     src: getImagePath('real', id),
+//     fallbackSrc: `${getImageFilename('real', id)}`,
+//     isAI: false
+//   };
+// });
+
+// // Generate the 400 AI image paths
+// const AI_DATASET = Array.from({ length: 400 }, (_, i) => {
+//   const id = i + 1;
+//   return {
+//     id: `ai_${id}`,
+//     src: getImagePath('ai', id),
+//     fallbackSrc: `${getImageFilename('ai', id)}`,
+//     isAI: true
+//   };
+// });
 
 /**
  * Helper function to pick `count` random elements from an array
