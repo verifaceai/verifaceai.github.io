@@ -100,17 +100,19 @@ onAuthStateChanged(auth, async (user) => {
  * Manages user profile & unique username prompting
  */
 async function handleUserLogin(user) {
-  const userRef = doc(db, "users", user.uid);
-  const snap = await getDoc(userRef);
+  try {
+    const userRef = doc(db, "users", user.uid);
+    const snap = await getDoc(userRef);
 
-  if (snap.exists() && snap.data().username) {
-    // User already exists and has a unique username
-    currentUsername = snap.data().username;
-    updateUserProfileUI(snap.data().username, user.photoURL, user.email);
-    await loadUserStats();
-  } else {
-    // First time user or missing username: prompt modal
-    showUsernameModal(user);
+    if (snap.exists() && snap.data().username) {
+      currentUsername = snap.data().username;
+      updateUserProfileUI(snap.data().username, user.photoURL, user.email);
+      await loadUserStats();
+    } else {
+      showUsernameModal(user);
+    }
+  } catch (err) {
+    console.error("Error handling user login:", err);
   }
 }
 
@@ -141,7 +143,6 @@ window.submitUsernameSelection = async function() {
   }
 
   try {
-    // 1. Check if username is already taken in 'usernames' collection
     const usernameRef = doc(db, "usernames", sanitizedUsername);
     const usernameSnap = await getDoc(usernameRef);
 
@@ -151,10 +152,8 @@ window.submitUsernameSelection = async function() {
       return;
     }
 
-    // 2. Claim username in 'usernames' collection
     await setDoc(usernameRef, { uid: currentUser.uid });
 
-    // 3. Save user doc with selected username
     const userRef = doc(db, "users", currentUser.uid);
     await setDoc(userRef, {
       uid: currentUser.uid,
@@ -179,8 +178,12 @@ window.submitUsernameSelection = async function() {
     await loadUserStats();
 
   } catch (err) {
-    console.error("Error setting username:", err);
-    errorEl.textContent = "Failed to reserve username. Please try again.";
+    console.error("Firebase Error details:", err.code, err.message);
+    if (err.code === "permission-denied") {
+      errorEl.textContent = "Permission denied. Check Firestore security rules.";
+    } else {
+      errorEl.textContent = `Error (${err.code || 'unknown'}): Unable to save. Try again.`;
+    }
     errorEl.classList.remove("hidden");
   }
 };
@@ -246,7 +249,6 @@ window.toggleUserMenu = function() {
   if (menu) menu.classList.toggle("hidden");
 };
 
-// Close dropdown on outside clicks
 window.addEventListener("click", (e) => {
   const menu = document.getElementById("user-menu");
   const avatarBtn = document.getElementById("user-avatar-btn");
@@ -307,22 +309,25 @@ export async function saveQuizAttempt(score, total, percentage, mistakenIds = []
  * Load User Dashboard Stats from Cloud Firestore
  */
 async function loadUserStats() {
-  if (!currentUser) return;
+  if (!currentUser || !currentUsername) return;
+
+  const attemptsEl = document.getElementById("stat-total-attempts");
+  const bestEl = document.getElementById("stat-best-score");
 
   try {
+    // 1. Fetch User Record
     const userRef = doc(db, "users", currentUser.uid);
     const snap = await getDoc(userRef);
 
     if (snap.exists()) {
       const data = snap.data();
-      const attemptsEl = document.getElementById("stat-total-attempts");
-      const bestEl = document.getElementById("stat-best-score");
-
       if (attemptsEl) attemptsEl.textContent = data.totalAttempts || 0;
       if (bestEl) bestEl.textContent = `${data.bestPercentage || 0}%`;
     }
 
+    // 2. Fetch User Performance Graph
     await loadUserPerformanceChart();
+
   } catch (error) {
     console.error("Error fetching user stats:", error);
   }
@@ -330,7 +335,7 @@ async function loadUserStats() {
 
 /**
  * Fetch and Render Performance Chart from Firestore BY USERNAME
- * Queries quiz_attempts collection where username == currentUsername
+ * Includes fallback logic in case Firestore index isn't created yet.
  */
 async function loadUserPerformanceChart() {
   const canvas = document.getElementById("user-performance-chart") || document.getElementById("performanceChart");
@@ -341,30 +346,54 @@ async function loadUserPerformanceChart() {
 
   try {
     const attemptsRef = collection(db, "quiz_attempts");
-    // Search specifically for attempts matching the distinct username
-    const q = query(
-      attemptsRef, 
-      where("username", "==", currentUsername), 
-      orderBy("timestamp", "asc")
-    );
+    let querySnapshot;
 
-    const querySnapshot = await getDocs(q);
+    try {
+      // Primary Query (requires Firestore Composite Index)
+      const q = query(
+        attemptsRef, 
+        where("username", "==", currentUsername), 
+        orderBy("timestamp", "asc")
+      );
+      querySnapshot = await getDocs(q);
+    } catch (indexError) {
+      console.warn("Firestore index missing. Falling back to un-ordered query:", indexError);
+      // Fallback Query (doesn't require composite index)
+      const qFallback = query(attemptsRef, where("username", "==", currentUsername));
+      querySnapshot = await getDocs(qFallback);
+    }
+
     const labels = [];
     const scores = [];
+    const attempts = [];
 
-    let attemptNum = 1;
     querySnapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      labels.push(`Attempt ${attemptNum}`);
-      scores.push(data.percentage);
-      attemptNum++;
+      attempts.push(docSnap.data());
     });
+
+    // Client-side sort fallback by timestamp if needed
+    attempts.sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0));
+
+    let maxPercent = 0;
+    attempts.forEach((data, idx) => {
+      labels.push(`Attempt ${idx + 1}`);
+      scores.push(data.percentage);
+      if (data.percentage > maxPercent) maxPercent = data.percentage;
+    });
+
+    // Update stats cards live from attempts collection directly
+    const attemptsEl = document.getElementById("stat-total-attempts");
+    const bestEl = document.getElementById("stat-best-score");
+
+    if (attemptsEl) attemptsEl.textContent = attempts.length;
+    if (bestEl && attempts.length > 0) bestEl.textContent = `${maxPercent}%`;
 
     renderChartInstance(
       canvas,
-      labels.length > 0 ? labels : ["Attempt 1"], 
+      labels.length > 0 ? labels : ["No Attempts"], 
       scores.length > 0 ? scores : [0]
     );
+
   } catch (error) {
     console.error("Error loading performance chart by username:", error);
   }
